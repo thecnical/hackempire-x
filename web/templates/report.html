@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Report{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 style="color:#58a6ff;">Scan Report</h4>
+    <small class="text-muted">Target: <strong style="color:#c9d1d9;">{{ target }}</strong> &nbsp;|&nbsp; Mode: <span class="badge bg-secondary">{{ mode }}</span></small>
+  </div>
+  <a href="/api/report/json" class="btn btn-sm btn-outline-info">&#8659; Download JSON</a>
+</div>
+
+<!-- Summary row -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header">Severity Breakdown</div>
+      <div class="card-body">
+        {% set counts = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0} %}
+        {% for v in vulnerabilities %}{% set _ = counts.update({v.severity_label: counts[v.severity_label] + 1}) %}{% endfor %}
+        {% for sev, cls in [('critical','danger'),('high','warning'),('medium','primary'),('low','success')] %}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="badge badge-{{ sev }} px-3">{{ sev }}</span>
+          <span class="fw-bold">{{ counts[sev] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header">Tool Health Summary</div>
+      <div class="card-body p-0">
+        {% if tool_health %}
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Tool</th><th>Status</th></tr></thead>
+          <tbody>
+          {% for tool, status in tool_health.items() %}
+          <tr>
+            <td>{{ tool }}</td>
+            <td>
+              {% if status == 'ok' %}<span class="badge bg-success">ok</span>
+              {% elif status == 'not_installed' %}<span class="badge bg-danger">not installed</span>
+              {% elif status == 'timeout' %}<span class="badge bg-warning text-dark">timeout</span>
+              {% elif status == 'skipped' %}<span class="badge bg-secondary">skipped</span>
+              {% else %}<span class="badge bg-danger">{{ status }}</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted p-3 mb-0">No tool data.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Vulnerabilities table -->
+<div class="card mb-4">
+  <div class="card-header">Vulnerabilities ({{ vulnerabilities | length }})</div>
+  <div class="card-body p-0">
+    {% if vulnerabilities %}
+    <table class="table table-sm mb-0">
+      <thead>
+        <tr>
+          <th>#</th><th>Name</th><th>Severity</th><th>Confidence</th><th>Target</th><th>Sources</th><th>Recommendation</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for v in vulnerabilities %}
+      <tr>
+        <td class="text-muted">{{ loop.index }}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ v.get('name') or v.get('title','') }}">
+          {{ v.get('name') or v.get('title','—') }}
+        </td>
+        <td><span class="badge badge-{{ v.severity_label }}">{{ v.severity_label }}</span></td>
+        <td>{{ "%.0f"|format(v.get('confidence',0)|float * 100) }}%</td>
+        <td class="text-muted small">{{ v.get('target','—') }}</td>
+        <td class="text-muted small">{{ (v.get('sources') or []) | join(', ') }}</td>
+        <td class="small" style="max-width:220px;">{{ v.recommendation }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted p-3 mb-0">No vulnerabilities recorded yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- AI Decisions -->
+{% if ai_decisions %}
+<div class="card mb-4">
+  <div class="card-header">AI Decisions</div>
+  <div class="card-body">
+    {% for phase, decision in ai_decisions.items() %}
+    <h6 class="text-muted text-uppercase small mb-1">{{ phase }}</h6>
+    <pre>{{ decision | tojson(indent=2) }}</pre>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

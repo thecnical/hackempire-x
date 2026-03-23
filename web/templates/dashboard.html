@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="mb-0" style="color:#58a6ff;">Scan Dashboard</h4>
+    <small class="text-muted">Target: <strong style="color:#c9d1d9;">{{ target }}</strong> &nbsp;|&nbsp; Mode: <span class="badge bg-secondary">{{ mode }}</span> &nbsp;|&nbsp; Phase: <span class="badge bg-primary">{{ current_phase or 'pending' }}</span></small>
+  </div>
+  <button class="btn btn-sm btn-outline-secondary" onclick="location.reload()">&#8635; Refresh</button>
+</div>
+
+<!-- Stat cards -->
+<div class="row g-3 mb-4">
+  {% for label, value, icon in [
+      ('Open Ports',   ports_count,      '&#128268;'),
+      ('Subdomains',   subdomains_count, '&#127760;'),
+      ('URLs',         urls_count,       '&#128279;'),
+      ('Vulns',        vulns_count,      '&#9888;'),
+  ] %}
+  <div class="col-6 col-md-3">
+    <div class="card stat-card text-center p-3">
+      <div style="font-size:1.6rem;">{{ icon }}</div>
+      <div class="display-6 fw-bold">{{ value }}</div>
+      <div class="text-muted small">{{ label }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-3">
+  <!-- Tool Health -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header">Tool Health</div>
+      <div class="card-body p-0">
+        {% if tool_health %}
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Tool</th><th>Status</th></tr></thead>
+          <tbody>
+          {% for tool, status in tool_health.items() %}
+          <tr>
+            <td>{{ tool }}</td>
+            <td>
+              {% if status == 'ok' %}
+                <span class="badge bg-success">ok</span>
+              {% elif status == 'not_installed' %}
+                <span class="badge bg-danger">not installed</span>
+              {% elif status == 'timeout' %}
+                <span class="badge bg-warning text-dark">timeout</span>
+              {% elif status == 'skipped' %}
+                <span class="badge bg-secondary">skipped</span>
+              {% else %}
+                <span class="badge bg-danger">{{ status }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted p-3 mb-0">No tool data yet. Start a scan.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- High-confidence vulnerabilities -->
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header">High-Confidence Vulnerabilities</div>
+      <div class="card-body p-0">
+        {% if high_conf_vulns %}
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Name</th><th>Severity</th><th>Confidence</th><th>Target</th></tr></thead>
+          <tbody>
+          {% for v in high_conf_vulns %}
+          {% set conf = v.get('confidence', 0) | float %}
+          {% if conf >= 0.85 %}{% set sev = 'critical' %}
+          {% elif conf >= 0.70 %}{% set sev = 'high' %}
+          {% elif conf >= 0.55 %}{% set sev = 'medium' %}
+          {% else %}{% set sev = 'low' %}{% endif %}
+          <tr>
+            <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ v.get('name') or v.get('title','') }}">{{ v.get('name') or v.get('title','—') }}</td>
+            <td><span class="badge badge-{{ sev }}">{{ sev }}</span></td>
+            <td>{{ "%.0f"|format(conf * 100) }}%</td>
+            <td class="text-muted small">{{ v.get('target','—') }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted p-3 mb-0">No high-confidence vulnerabilities found yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Attack Tree -->
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">Attack Tree</div>
+      <div class="card-body tree">
+        {% macro render_tree(node) %}
+        <li>
+          <span class="tree-node">{{ node.label }}</span>
+          {% if node.children %}
+          <ul>{% for child in node.children %}{{ render_tree(child) }}{% endfor %}</ul>
+          {% endif %}
+        </li>
+        {% endmacro %}
+        <ul>{{ render_tree(attack_tree) }}</ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Live Logs{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 style="color:#58a6ff;">Live Log Viewer</h4>
+  <div class="d-flex align-items-center gap-2">
+    <span class="text-muted small" id="refresh-status">Auto-refresh: ON</span>
+    <button class="btn btn-sm btn-outline-secondary" id="toggle-refresh">Pause</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between">
+    <span>logs/hackempire.log <span class="badge bg-secondary ms-2" id="line-count">{{ log_lines | length }} lines</span></span>
+    <span class="text-muted small" id="last-updated"></span>
+  </div>
+  <div class="card-body p-0">
+    <pre id="log-output">{% for line in log_lines %}{{ line }}
+{% endfor %}</pre>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let autoRefresh = true;
+  let intervalId = null;
+
+  function updateLogs() {
+    fetch('/api/logs')
+      .then(r => r.json())
+      .then(data => {
+        const pre = document.getElementById('log-output');
+        const lines = data.lines || [];
+        pre.textContent = lines.join('\n');
+        pre.scrollTop = pre.scrollHeight;
+        document.getElementById('line-count').textContent = lines.length + ' lines';
+        document.getElementById('last-updated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+      })
+      .catch(() => {});
+  }
+
+  function startRefresh() {
+    intervalId = setInterval(updateLogs, 3000);
+  }
+
+  document.getElementById('toggle-refresh').addEventListener('click', function () {
+    autoRefresh = !autoRefresh;
+    if (autoRefresh) {
+      this.textContent = 'Pause';
+      document.getElementById('refresh-status').textContent = 'Auto-refresh: ON';
+      startRefresh();
+    } else {
+      this.textContent = 'Resume';
+      document.getElementById('refresh-status').textContent = 'Auto-refresh: OFF';
+      clearInterval(intervalId);
+    }
+  });
+
+  // Scroll to bottom on load
+  const pre = document.getElementById('log-output');
+  pre.scrollTop = pre.scrollHeight;
+
+  startRefresh();
+</script>
+{% endblock %}

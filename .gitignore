@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# HackEmpire X runtime files
+logs/hackempire.log
+logs/scan_state.json
+logs/scan_state.tmp
+
+# Environment / secrets
+.env
+*.env
+.envrc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
