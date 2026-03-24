@@ -16,10 +16,6 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
 
-    defaults:
-      run:
-        working-directory: hackempire
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,11 +24,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
-          cache-dependency-path: hackempire/requirements.txt
 
       - name: Install dependencies
+        working-directory: hackempire
         run: pip install -r requirements.txt
 
       - name: Run tests
+        working-directory: hackempire
         run: python -m pytest tests/ -q --tb=short
