@@ -16,6 +16,10 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
 
+    defaults:
+      run:
+        working-directory: hackempire
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,17 +29,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
+          cache-dependency-path: hackempire/requirements.txt
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
       - name: Run tests
         run: python -m pytest tests/ -q --tb=short
-
-      - name: Upload hypothesis database
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: hypothesis-db-${{ matrix.python-version }}
-          path: .hypothesis/
-          retention-days: 7
