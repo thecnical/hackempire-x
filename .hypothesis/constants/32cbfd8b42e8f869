@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\post_exploit\linpeas_tool.py
+# hypothesis_version: 6.151.9
+
+['-a', '==>', 'LINPEAS_SCRIPT', 'SUID', '\\x1b\\[[0-9;]*m', 'bash', 'findings', 'linpeas', 'linpeas.sh', 'post_exploit', 'writable']

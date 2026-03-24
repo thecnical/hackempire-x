@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\url_discovery\katana_tool.py
+# hypothesis_version: 6.151.9
+
+['(https?://\\S+)', '-proxy', '-silent', '-u', '\\x1b\\[[0-9;]*m', 'katana', 'url_discovery', 'urls']

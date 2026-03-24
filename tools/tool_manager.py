@@ -8,10 +8,13 @@ Extends the original architecture with:
 - Adaptive skip logic (driven by orchestrator via skip_tools param)
 - Parallel execution with configurable max_workers
 - Robust per-tool error handling (no crash on failure)
+- PHASE_TOOLS_2025 registry (7 phases, 6 tools each)
+- ToolVenvManager integration for pip-based tools
 """
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any, Optional
 
 from core.phases import Phase
@@ -26,12 +29,50 @@ from tools.deduplicator import (
 from tools.health_tracker import ToolHealthTracker
 from utils.logger import Logger
 
+# --- Existing tool imports (backward compat) ---
 from tools.recon.nmap_tool import NmapTool
 from tools.recon.subfinder_tool import SubfinderTool
 from tools.recon.whatweb_tool import WhatWebTool
 from tools.enum.dirsearch_tool import DirsearchTool
 from tools.enum.ffuf_tool import FFUFTool
 from tools.vuln.nuclei_tool import NucleiTool
+
+# --- New recon tools ---
+from tools.recon.httpx_tool import HttpxTool
+from tools.recon.dnsx_tool import DnsxTool
+
+# --- New url_discovery tools ---
+from tools.url_discovery.katana_tool import KatanaTool
+from tools.url_discovery.gauplus_tool import GauTool
+
+# --- New enum tools ---
+from tools.enum.feroxbuster_tool import FeroxbusterTool
+from tools.enum.arjun_tool import ArjunTool
+
+# --- New vuln tools ---
+from tools.vuln.nikto_tool import NiktoTool
+from tools.vuln.dalfox_tool import DalfoxTool
+from tools.vuln.ghauri_tool import GhauriTool
+from tools.vuln.sqlmap_tool import SqlmapTool
+
+# --- New post_exploit tools ---
+from tools.post_exploit.linpeas_tool import LinpeasTool
+from tools.post_exploit.crackmapexec_tool import CrackMapExecTool
+
+
+# ---------------------------------------------------------------------------
+# PHASE_TOOLS_2025 — 7 phases × 6 tools each
+# ---------------------------------------------------------------------------
+
+PHASE_TOOLS_2025: dict[str, list[str]] = {
+    "recon":         ["subfinder", "amass", "httpx", "dnsx", "shuffledns", "github-subdomains"],
+    "url_discovery": ["katana", "gau", "waybackurls", "hakrawler", "gospider", "cariddi"],
+    "enumeration":   ["feroxbuster", "ffuf", "dirsearch", "arjun", "kiterunner", "paramspider"],
+    "vuln_scan":     ["nuclei", "afrog", "nikto", "dalfox", "ghauri", "testssl"],
+    "exploitation":  ["sqlmap", "xsstrike", "commix", "caido", "metasploit-rpc", "ghauri"],
+    "post_exploit":  ["linpeas", "crackmapexec", "impacket", "bloodhound", "trufflehog", "jsluice"],
+    "reporting":     ["ai-summary", "pdf-generator", "html-report", "json-export", "markdown-export", "csv-export"],
+}
 
 
 class ToolManager:
@@ -49,9 +90,18 @@ class ToolManager:
     """
 
     TOOL_REGISTRY: dict[str, list[type[BaseTool]]] = {
+        # Legacy phase keys (backward compat)
         Phase.RECON.value: [NmapTool, SubfinderTool, WhatWebTool],
         Phase.ENUM.value: [DirsearchTool, FFUFTool],
         Phase.VULN.value: [NucleiTool],
+        # New 2025 phase keys
+        "recon":         [SubfinderTool, HttpxTool, DnsxTool],
+        "url_discovery": [KatanaTool, GauTool],
+        "enumeration":   [FeroxbusterTool, FFUFTool, DirsearchTool, ArjunTool],
+        "vuln_scan":     [NucleiTool, NiktoTool, DalfoxTool, GhauriTool],
+        "exploitation":  [SqlmapTool],
+        "post_exploit":  [LinpeasTool, CrackMapExecTool],
+        "reporting":     [],
     }
 
     def __init__(
@@ -64,6 +114,7 @@ class ToolManager:
         web_scheme: str,
         health_tracker: Optional[ToolHealthTracker] = None,
         proxy: Optional[str] = None,
+        venv_manager: Optional[Any] = None,
     ) -> None:
         self._logger = logger
         self._timeout_s = timeout_s
@@ -71,8 +122,8 @@ class ToolManager:
         self._max_workers = max_workers
         self._web_scheme = web_scheme
         self._proxy = proxy
-        # Shared health tracker — injected or created locally.
         self._health_tracker: ToolHealthTracker = health_tracker or ToolHealthTracker()
+        self._venv_manager: Optional[Any] = venv_manager
 
     # ------------------------------------------------------------------
     # Public helpers
@@ -98,12 +149,6 @@ class ToolManager:
         """
         Run all tools for a phase and return a normalized, deduplicated,
         confidence-scored result dict.
-
-        Args:
-            phase: The current execution phase.
-            target: The scan target (domain or IP).
-            ai_tool_priorities: Tool names the AI suggested running first.
-            skip_tools: Tool names to skip (adaptive skip from orchestrator).
         """
         tool_classes = self._select_tools(phase, ai_tool_priorities, skip_tools)
         tool_instances = self._instantiate_tools(tool_classes)
@@ -120,7 +165,6 @@ class ToolManager:
             self._logger.warning(f"No tools to run for phase '{phase.value}'.")
             return normalized
 
-        # Accumulator for vulnerability merge (keyed by (name_lower, target_norm)).
         vuln_records: dict[tuple[str, str], dict[str, Any]] = {}
         target_norm = normalize_domain(target)
         phase_tool_status: dict[str, str] = {}
@@ -134,7 +178,6 @@ class ToolManager:
                 tool_instances, target, normalized, vuln_records, phase_tool_status, target_norm
             )
 
-        # Finalize: deduplicate + sort.
         normalized["ports"] = deduplicate_ports(normalized["ports"])
         normalized["subdomains"] = deduplicate_subdomains(normalized["subdomains"])
         normalized["urls"] = deduplicate_urls(normalized["urls"])
@@ -142,7 +185,6 @@ class ToolManager:
         vulns = list(vuln_records.values())
         vulns.sort(key=lambda v: float(v.get("confidence", 0.0)), reverse=True)
         normalized["vulnerabilities"] = vulns
-
         normalized["tool_status"] = phase_tool_status
 
         # CVE Correlation — run after recon to map open ports → CVEs
@@ -158,7 +200,6 @@ class ToolManager:
                 self._logger.warning(f"[cve] CVE correlation failed (non-fatal): {exc}")
                 normalized["cve_findings"] = []
 
-        # Persist health into the shared tracker.
         self._health_tracker.merge_phase_status(phase_tool_status)
 
         self._logger.info(
@@ -203,10 +244,23 @@ class ToolManager:
         return prioritized + remainder
 
     def _instantiate_tools(self, tool_classes: list[type[BaseTool]]) -> list[BaseTool]:
-        return [
-            cls(timeout_s=self._timeout_s, web_scheme=self._web_scheme, proxy=self._proxy)  # type: ignore[arg-type]
-            for cls in tool_classes
-        ]
+        instances: list[BaseTool] = []
+        for cls in tool_classes:
+            kwargs: dict[str, Any] = {
+                "timeout_s": self._timeout_s,
+                "web_scheme": self._web_scheme,
+                "proxy": self._proxy,
+            }
+            # Inject venv_python for pip-based tools
+            venv_packages = getattr(cls, "venv_packages", None)
+            if venv_packages and self._venv_manager is not None:
+                venv_python: Optional[Path] = self._venv_manager.ensure_venv(
+                    cls.name, venv_packages
+                )
+                if venv_python:
+                    kwargs["venv_python"] = venv_python
+            instances.append(cls(**kwargs))  # type: ignore[arg-type]
+        return instances
 
     # ------------------------------------------------------------------
     # Internal: execution strategies

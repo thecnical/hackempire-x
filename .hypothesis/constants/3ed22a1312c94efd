@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\core\phases.py
+# hypothesis_version: 6.151.9
+
+['enum', 'enumeration', 'exploitation', 'post_exploit', 'recon', 'reporting', 'url_discovery', 'vuln', 'vuln_scan']

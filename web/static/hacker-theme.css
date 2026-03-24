@@ -1,0 +1,106 @@
+/* HackEmpire X — Hacker Theme */
+:root {
+  --bg-primary:    #0a0a0a;
+  --bg-secondary:  #111111;
+  --bg-card:       #161616;
+  --bg-header:     #1a1a1a;
+  --text-primary:  #00ff41;
+  --text-secondary:#8b949e;
+  --text-muted:    #555555;
+  --border-color:  #2a2a2a;
+  --accent:        #00ff41;
+  --font-mono:     'Courier New', Courier, monospace;
+
+  /* Severity border colors */
+  --severity-critical: #ff0000;
+  --severity-high:     #ff6600;
+  --severity-medium:   #ffaa00;
+  --severity-low:      #00ff41;
+  --severity-info:     #00aaff;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+}
+
+.card-header {
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+/* Finding cards with severity borders */
+.finding-card { border-left: 4px solid var(--border-color); }
+.finding-card.severity-critical { border-left-color: var(--severity-critical); }
+.finding-card.severity-high     { border-left-color: var(--severity-high); }
+.finding-card.severity-medium   { border-left-color: var(--severity-medium); }
+.finding-card.severity-low      { border-left-color: var(--severity-low); }
+.finding-card.severity-info     { border-left-color: var(--severity-info); }
+
+/* Severity badges */
+.badge-critical { background: var(--severity-critical) !important; color: #fff; }
+.badge-high     { background: var(--severity-high) !important;     color: #fff; }
+.badge-medium   { background: var(--severity-medium) !important;   color: #000; }
+.badge-low      { background: var(--severity-low) !important;      color: #000; }
+.badge-info     { background: var(--severity-info) !important;     color: #fff; }
+
+/* Tables */
+.table { color: var(--text-primary); }
+.table thead th {
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+  font-size: .75rem;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+}
+.table td, .table th { border-color: var(--border-color); }
+
+/* Vuln feed */
+#vuln-feed { max-height: 320px; overflow-y: auto; }
+.vuln-feed-item {
+  padding: .5rem .75rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: .82rem;
+  animation: fadeIn .4s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; } }
+
+/* Phase progress rings */
+.phase-ring-label {
+  font-size: .7rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: .3rem;
+  font-family: var(--font-mono);
+}
+
+/* AI Decision Panel */
+#ai-decision-panel .ai-entry {
+  padding: .4rem .75rem;
+  border-left: 3px solid var(--accent);
+  margin-bottom: .5rem;
+  font-size: .82rem;
+  background: var(--bg-secondary);
+}
+
+/* Terminal tab */
+#terminal-container {
+  background: #000;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 4px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }

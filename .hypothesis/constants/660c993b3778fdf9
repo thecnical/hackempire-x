@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\vuln\nuclei_tool.py
+# hypothesis_version: 6.151.9
+
+['(https?://[^\\s\\]]+)', '-proxy', '-u', '/', '\\x1b\\[[0-9;]*m', 'nuclei', 'severity', 'title', 'url', 'vuln', 'vulnerabilities']

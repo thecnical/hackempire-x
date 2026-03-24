@@ -10,6 +10,8 @@ import io
 from datetime import datetime
 from typing import Any
 
+from utils.validator import sanitize_for_html
+
 try:
     from weasyprint import HTML as _WP_HTML
     _WEASYPRINT_AVAILABLE = True
@@ -44,8 +46,8 @@ _SEVERITY_COLORS = {
 
 def _build_html(state: dict[str, Any]) -> str:
     """Render the full report as an HTML string."""
-    target = state.get("target") or "—"
-    mode = state.get("mode") or "—"
+    target = sanitize_for_html(state.get("target") or "—")
+    mode = sanitize_for_html(state.get("mode") or "—")
     tool_health = state.get("tool_health") or {}
     data = state.get("data") or {}
     recon = data.get("recon") or {}
@@ -67,9 +69,9 @@ def _build_html(state: dict[str, Any]) -> str:
         conf = _safe_float(v.get("confidence", 0))
         sev = _severity_label(conf)
         color = _SEVERITY_COLORS.get(sev, "#888")
-        name = str(v.get("name") or v.get("title") or "—")
-        tgt = str(v.get("target") or "—")
-        sources = ", ".join(v.get("sources") or [])
+        name = sanitize_for_html(str(v.get("name") or v.get("title") or "—"))
+        tgt = sanitize_for_html(str(v.get("target") or "—"))
+        sources = sanitize_for_html(", ".join(v.get("sources") or []))
         vuln_rows += f"""
         <tr>
           <td>{i}</td>
@@ -86,27 +88,27 @@ def _build_html(state: dict[str, Any]) -> str:
         score = _safe_float(c.get("cvss_score", 0))
         sev = c.get("severity") or _severity_label(score)
         color = _SEVERITY_COLORS.get(sev, "#888")
-        refs = " ".join(f'<a href="{r}" style="color:#58a6ff;">[ref]</a>' for r in (c.get("references") or []))
+        refs = " ".join(f'<a href="{sanitize_for_html(r)}" style="color:#58a6ff;">[ref]</a>' for r in (c.get("references") or []))
         cve_rows += f"""
         <tr>
-          <td><strong>{c.get("cve_id","—")}</strong></td>
-          <td>{c.get("service","—")} / port {c.get("port","—")}</td>
+          <td><strong>{sanitize_for_html(str(c.get("cve_id","—")))}</strong></td>
+          <td>{sanitize_for_html(str(c.get("service","—")))} / port {sanitize_for_html(str(c.get("port","—")))}</td>
           <td><span style="background:{color};color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">{sev}</span></td>
           <td>{score}</td>
-          <td style="font-size:11px;">{(c.get("description") or "")[:200]}</td>
+          <td style="font-size:11px;">{sanitize_for_html((c.get("description") or "")[:200])}</td>
           <td>{refs}</td>
         </tr>"""
 
     # Tech rows
     tech_rows = ""
     for t in technologies:
-        tech_rows += f"<tr><td>{t.get('name','—')}</td><td>{t.get('version','—')}</td><td>{t.get('detail','—')}</td></tr>"
+        tech_rows += f"<tr><td>{sanitize_for_html(str(t.get('name','—')))}</td><td>{sanitize_for_html(str(t.get('version','—')))}</td><td>{sanitize_for_html(str(t.get('detail','—')))}</td></tr>"
 
     # Tool health rows
     health_rows = ""
     for tool, status in tool_health.items():
         color = "#3fb950" if status == "ok" else "#da3633" if status in ("failed", "not_installed") else "#888"
-        health_rows += f'<tr><td>{tool}</td><td style="color:{color};font-weight:bold;">{status}</td></tr>'
+        health_rows += f'<tr><td>{sanitize_for_html(str(tool))}</td><td style="color:{color};font-weight:bold;">{sanitize_for_html(str(status))}</td></tr>'
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -164,7 +166,7 @@ def _build_html(state: dict[str, Any]) -> str:
 
 <section>
   <h2>Open Ports</h2>
-  {"<table><thead><tr><th>Port</th><th>Service</th><th>State</th></tr></thead><tbody>" + "".join(f"<tr><td>{p.get('port','—')}</td><td>{p.get('service','—')}</td><td>{p.get('state','open')}</td></tr>" for p in ports if isinstance(p, dict)) + "</tbody></table>" if ports else "<p style='color:#888;'>No open ports found.</p>"}
+  {"<table><thead><tr><th>Port</th><th>Service</th><th>State</th></tr></thead><tbody>" + "".join(f"<tr><td>{sanitize_for_html(str(p.get('port','—')))}</td><td>{sanitize_for_html(str(p.get('service','—')))}</td><td>{sanitize_for_html(str(p.get('state','open')))}</td></tr>" for p in ports if isinstance(p, dict)) + "</tbody></table>" if ports else "<p style='color:#888;'>No open ports found.</p>"}
 </section>
 
 <section>
@@ -179,7 +181,7 @@ def _build_html(state: dict[str, Any]) -> str:
 
 <section>
   <h2>Subdomains ({len(subdomains)})</h2>
-  {"<p>" + ", ".join(subdomains[:50]) + ("..." if len(subdomains) > 50 else "") + "</p>" if subdomains else "<p style='color:#888;'>None found.</p>"}
+  {"<p>" + ", ".join(sanitize_for_html(s) for s in subdomains[:50]) + ("..." if len(subdomains) > 50 else "") + "</p>" if subdomains else "<p style='color:#888;'>None found.</p>"}
 </section>
 
 <section>

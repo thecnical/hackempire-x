@@ -24,6 +24,9 @@ def write_state(
     current_phase: str,
     data: dict[str, Any],
     tool_health: dict[str, str],
+    todo_list: Any = None,
+    ai_decisions: Any = None,
+    waf_result: Any = None,
 ) -> None:
     """Persist the current scan state to disk atomically."""
     payload: dict[str, Any] = {
@@ -32,6 +35,9 @@ def write_state(
         "current_phase": current_phase,
         "data": data,
         "tool_health": tool_health,
+        "todo_list": todo_list,
+        "ai_decisions": ai_decisions if ai_decisions is not None else {},
+        "waf_result": waf_result,
     }
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp = STATE_FILE.with_suffix(".tmp")
@@ -50,6 +56,9 @@ _EMPTY_TEMPLATE: dict[str, Any] = {
     "current_phase": "",
     "data": {"recon": {}, "enum": {}, "vuln": {}},
     "tool_health": {},
+    "todo_list": None,
+    "ai_decisions": {},
+    "waf_result": None,
 }
 
 

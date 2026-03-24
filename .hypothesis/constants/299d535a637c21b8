@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\installer\tool_installer.py
+# hypothesis_version: 6.151.9
+
+[300, '-m', '-y', '/opt/caido', '/opt/commix', '/opt/dirsearch', '/opt/peass', '/opt/testssl', '/opt/xsstrike', 'Install? (y/n): ', 'afrog', 'already_installed', 'amass', 'apt', 'apt-get', 'arjun', 'beginner', 'bloodhound', 'caido', 'cariddi', 'clone', 'commix', 'crackmapexec', 'dalfox', 'dirsearch', 'dnsx', 'failed', 'feroxbuster', 'ffuf', 'gau', 'gem', 'ghauri', 'git', 'github-subdomains', 'go', 'gospider', 'hakrawler', 'httpx', 'impacket', 'install', 'installed', 'jsluice', 'katana', 'kiterunner', 'kr', 'linpeas', 'nikto', 'nmap', 'not_installed', 'nuclei', 'paramspider', 'pip', 'pro', 'replace', 'script', 'shuffledns', 'skipped', 'sqlmap', 'subfinder', 'testssl', 'testssl.sh', 'trufflehog', 'waybackurls', 'whatweb', 'xsstrike', 'y', 'yes']

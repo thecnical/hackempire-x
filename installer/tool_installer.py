@@ -24,7 +24,7 @@ from utils.logger import Logger
 # Install method type
 # ---------------------------------------------------------------------------
 
-InstallMethod = Literal["apt", "pip", "git"]
+InstallMethod = Literal["apt", "pip", "git", "go", "gem", "script"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,18 +44,53 @@ class ToolInstallSpec:
 # ---------------------------------------------------------------------------
 
 TOOL_INSTALL_SPECS: dict[str, ToolInstallSpec] = {
-    "nmap": ToolInstallSpec(name="nmap", method="apt", package="nmap"),
-    "subfinder": ToolInstallSpec(name="subfinder", method="apt", package="subfinder"),
-    "nuclei": ToolInstallSpec(name="nuclei", method="apt", package="nuclei"),
-    "ffuf": ToolInstallSpec(name="ffuf", method="apt", package="ffuf"),
-    "whatweb": ToolInstallSpec(name="whatweb", method="apt", package="whatweb"),
-    "dirsearch": ToolInstallSpec(
+    # --- original tools ---
+    "nmap":       ToolInstallSpec(name="nmap",       method="apt", package="nmap"),
+    "subfinder":  ToolInstallSpec(name="subfinder",  method="apt", package="subfinder"),
+    "nuclei":     ToolInstallSpec(name="nuclei",     method="apt", package="nuclei"),
+    "ffuf":       ToolInstallSpec(name="ffuf",       method="apt", package="ffuf"),
+    "whatweb":    ToolInstallSpec(name="whatweb",    method="apt", package="whatweb"),
+    "dirsearch":  ToolInstallSpec(
         name="dirsearch",
         method="git",
         package="https://github.com/maurosoria/dirsearch.git",
         post_install_bin="dirsearch",
         git_dest="/opt/dirsearch",
     ),
+    # --- Go-based tools (Upgrade 1) ---
+    "httpx":             ToolInstallSpec(name="httpx",             method="go", package="github.com/projectdiscovery/httpx/cmd/httpx@latest"),
+    "dnsx":              ToolInstallSpec(name="dnsx",              method="go", package="github.com/projectdiscovery/dnsx/cmd/dnsx@latest"),
+    "shuffledns":        ToolInstallSpec(name="shuffledns",        method="go", package="github.com/projectdiscovery/shuffledns/cmd/shuffledns@latest"),
+    "katana":            ToolInstallSpec(name="katana",            method="go", package="github.com/projectdiscovery/katana/cmd/katana@latest"),
+    "hakrawler":         ToolInstallSpec(name="hakrawler",         method="go", package="github.com/hakluke/hakrawler@latest"),
+    "gospider":          ToolInstallSpec(name="gospider",          method="go", package="github.com/jaeles-project/gospider@latest"),
+    "kiterunner":        ToolInstallSpec(name="kr",                method="go", package="github.com/assetnote/kiterunner/cmd/kr@latest"),
+    "afrog":             ToolInstallSpec(name="afrog",             method="go", package="github.com/zan8in/afrog/cmd/afrog@latest"),
+    "dalfox":            ToolInstallSpec(name="dalfox",            method="go", package="github.com/hahwul/dalfox/v2@latest"),
+    "jsluice":           ToolInstallSpec(name="jsluice",           method="go", package="github.com/BishopFox/jsluice/cmd/jsluice@latest"),
+    "trufflehog":        ToolInstallSpec(name="trufflehog",        method="go", package="github.com/trufflesecurity/trufflehog/v3@latest"),
+    "gau":               ToolInstallSpec(name="gau",               method="go", package="github.com/lc/gau/v2/cmd/gau@latest"),
+    "waybackurls":       ToolInstallSpec(name="waybackurls",       method="go", package="github.com/tomnomnom/waybackurls@latest"),
+    "cariddi":           ToolInstallSpec(name="cariddi",           method="go", package="github.com/edoardottt/cariddi/cmd/cariddi@latest"),
+    "github-subdomains": ToolInstallSpec(name="github-subdomains", method="go", package="github.com/gwen001/github-subdomains@latest"),
+    # --- pip-based tools (Upgrade 1) ---
+    "arjun":        ToolInstallSpec(name="arjun",        method="pip", package="arjun"),
+    "paramspider":  ToolInstallSpec(name="paramspider",  method="pip", package="paramspider"),
+    "ghauri":       ToolInstallSpec(name="ghauri",       method="pip", package="ghauri"),
+    "bloodhound":   ToolInstallSpec(name="bloodhound",   method="pip", package="bloodhound"),
+    "impacket":     ToolInstallSpec(name="impacket",     method="pip", package="impacket"),
+    "crackmapexec": ToolInstallSpec(name="crackmapexec", method="pip", package="crackmapexec"),
+    # --- git-based tools (Upgrade 1) ---
+    "xsstrike": ToolInstallSpec(name="xsstrike",   method="git", package="https://github.com/s0md3v/XSStrike.git",          git_dest="/opt/xsstrike"),
+    "commix":   ToolInstallSpec(name="commix",     method="git", package="https://github.com/commixproject/commix.git",     git_dest="/opt/commix"),
+    "linpeas":  ToolInstallSpec(name="linpeas",    method="git", package="https://github.com/carlospolop/PEASS-ng.git",     git_dest="/opt/peass"),
+    "caido":    ToolInstallSpec(name="caido",      method="git", package="https://github.com/caido/caido.git",              git_dest="/opt/caido"),
+    "testssl":  ToolInstallSpec(name="testssl.sh", method="git", package="https://github.com/drwetter/testssl.sh.git",      git_dest="/opt/testssl"),
+    # --- apt-based tools (Upgrade 1) ---
+    "feroxbuster": ToolInstallSpec(name="feroxbuster", method="apt", package="feroxbuster"),
+    "nikto":       ToolInstallSpec(name="nikto",       method="apt", package="nikto"),
+    "sqlmap":      ToolInstallSpec(name="sqlmap",      method="apt", package="sqlmap"),
+    "amass":       ToolInstallSpec(name="amass",       method="apt", package="amass"),
 }
 
 
@@ -172,6 +207,12 @@ class ToolInstaller:
                 self._run_pip(spec)
             elif spec.method == "git":
                 self._run_git(spec)
+            elif spec.method == "go":
+                self._run_go(spec)
+            elif spec.method == "gem":
+                self._run_gem(spec)
+            elif spec.method == "script":
+                self._run_script(spec)
             else:
                 raise ValueError(f"Unknown install method: {spec.method}")
         except Exception as exc:
@@ -203,6 +244,18 @@ class ToolInstaller:
     def _run_git(self, spec: ToolInstallSpec) -> None:
         dest = spec.git_dest or f"/opt/{spec.name}"
         cmd = ["git", "clone", spec.package, dest]
+        self._run_subprocess(cmd, tool_name=spec.name)
+
+    def _run_go(self, spec: ToolInstallSpec) -> None:
+        cmd = ["go", "install", spec.package]
+        self._run_subprocess(cmd, tool_name=spec.name)
+
+    def _run_gem(self, spec: ToolInstallSpec) -> None:
+        cmd = ["gem", "install", spec.package]
+        self._run_subprocess(cmd, tool_name=spec.name)
+
+    def _run_script(self, spec: ToolInstallSpec) -> None:
+        cmd = [spec.package]
         self._run_subprocess(cmd, tool_name=spec.name)
 
     def _run_subprocess(self, cmd: list[str], *, tool_name: str) -> None:

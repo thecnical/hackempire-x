@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\installer\__init__.py
+# hypothesis_version: 6.151.9
+
+['DependencyChecker', 'DependencyResolver', 'ToolDoctor', 'ToolInstaller']

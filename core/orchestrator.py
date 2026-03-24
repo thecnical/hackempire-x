@@ -355,3 +355,244 @@ class Orchestrator:
         self._logger.success("Orchestration complete for Phase 1 (tool execution attempted).")
         return results
 
+
+
+# ---------------------------------------------------------------------------
+# OrchestratorV2 — 7-phase pipeline with PhaseManager, WAF, Tor, AI, Emitter
+# ---------------------------------------------------------------------------
+
+import uuid as _uuid
+from datetime import datetime as _datetime, timezone as _timezone
+from typing import TYPE_CHECKING as _TYPE_CHECKING
+
+if _TYPE_CHECKING:
+    from hackempire.ai.ai_engine import AIEngine
+    from hackempire.core.phase_manager import PhaseManager
+    from hackempire.web.realtime_emitter import RealTimeEmitter
+
+
+class OrchestratorV2:
+    """7-phase orchestrator wrapping PhaseManager with WAF, Tor, AI, and emitter support."""
+
+    def __init__(
+        self,
+        *,
+        config: "Config",
+        logger: "Logger",
+        emitter: "RealTimeEmitter | None" = None,
+        ai_engine: "AIEngine | None" = None,
+        phase_manager: "PhaseManager | None" = None,
+    ) -> None:
+        self._config = config
+        self._logger = logger
+        self._emitter = emitter
+        self._ai_engine = ai_engine
+        self._phase_manager = phase_manager
+
+    def run_full_scan(self, target: str) -> dict:
+        """Execute the full 7-phase scan. Never raises — returns partial results on error."""
+        try:
+            return self._run_full_scan_impl(target)
+        except Exception as exc:  # noqa: BLE001
+            self._logger.error(f"[OrchestratorV2] Unexpected top-level error: {exc}")
+            return {
+                "target": target,
+                "session_id": "",
+                "mode": self._config.mode,
+                "started_at": "",
+                "phase_results": {},
+                "waf_result": None,
+                "ai_decisions": {},
+                "todo_list": None,
+                "error": str(exc),
+            }
+
+    def _run_full_scan_impl(self, target: str) -> dict:
+        from hackempire.core.models import ScanContext, TodoList  # noqa: PLC0415
+
+        session_id = str(_uuid.uuid4())
+        started_at = _datetime.now(_timezone.utc).isoformat()
+
+        context = ScanContext(
+            target=target,
+            mode=self._config.mode,
+            session_id=session_id,
+            started_at=started_at,
+        )
+
+        # Step 1: Generate todo list via AIEngine (or empty fallback)
+        todo = self._generate_todo(target, context)
+        context.todo_list = todo
+
+        # Step 2: Emit todo update
+        if self._emitter is not None:
+            try:
+                self._emitter.emit_todo_update(todo)
+            except Exception as exc:  # noqa: BLE001
+                self._logger.warning(f"[OrchestratorV2] Failed to emit todo update: {exc}")
+
+        # Step 3: Stealth mode — start Tor before any tool runs
+        if self._config.mode == "stealth":
+            self._start_tor()
+
+        # Step 4: Run all 7 phases via PhaseManager
+        if self._phase_manager is not None:
+            self._run_phases(self._phase_manager, target, context)
+        else:
+            self._logger.warning("[OrchestratorV2] No PhaseManager provided — phases will be skipped.")
+
+        # Step 5: Emit scan_complete with final report
+        final_report = self._build_final_report(context)
+        if self._emitter is not None:
+            try:
+                self._emitter.emit_scan_complete(final_report)
+            except Exception as exc:  # noqa: BLE001
+                self._logger.warning(f"[OrchestratorV2] Failed to emit scan_complete: {exc}")
+
+        return final_report
+
+    def _generate_todo(self, target: str, context: Any) -> Any:
+        """Generate todo list via AIEngine or return empty TodoList."""
+        from hackempire.core.models import TodoList  # noqa: PLC0415
+
+        if self._ai_engine is not None:
+            try:
+                return self._ai_engine.generate_todo_list(target, context)
+            except Exception as exc:  # noqa: BLE001
+                self._logger.warning(f"[OrchestratorV2] AI todo generation failed: {exc}")
+
+        return TodoList(
+            target=target,
+            phases={},
+            created_at=_datetime.now(_timezone.utc).isoformat(),
+        )
+
+    def _start_tor(self) -> None:
+        """Initialize and start TorManager. Log warning if Tor fails to start within 30s."""
+        try:
+            from hackempire.core.tor_manager import TorManager  # noqa: PLC0415
+
+            tor = TorManager()
+            started = tor.start()
+            if not started:
+                self._logger.warning(
+                    "[OrchestratorV2] Tor failed to start within 30s — "
+                    "continuing scan without anonymization."
+                )
+            else:
+                self._logger.info("[OrchestratorV2] Tor started successfully.")
+        except Exception as exc:  # noqa: BLE001
+            self._logger.warning(
+                f"[OrchestratorV2] TorManager initialization failed: {exc} — "
+                "continuing without anonymization."
+            )
+
+    def _run_phases(self, phase_manager: Any, target: str, context: Any) -> None:
+        """Run all 7 phases in order, applying post-phase hooks after each."""
+        from hackempire.core.phases import Phase  # noqa: PLC0415
+
+        for phase in phase_manager.PHASES:
+            # Gate exploitation phase behind --mode=exploit
+            # Satisfies Requirement 18.3: exploitation-phase tools are disabled when mode != "exploit"
+            if phase is Phase.EXPLOITATION and self._config.mode != "exploit":
+                self._logger.warning(
+                    "[OrchestratorV2] Skipping EXPLOITATION phase — "
+                    "requires --mode=exploit (current mode: %s).",
+                    self._config.mode,
+                )
+                context.phase_results[phase.value] = {
+                    "skipped": True,
+                    "reason": "mode != exploit",
+                }
+                continue
+
+            # Run the phase (PhaseManager.run_phase never raises)
+            try:
+                phase_result = phase_manager.run_phase(phase, target, context)
+            except Exception as exc:  # noqa: BLE001
+                self._logger.error(
+                    f"[OrchestratorV2] Phase '{phase.value}' raised unexpectedly: {exc}"
+                )
+                phase_result = None
+
+            # Store phase result in context
+            if phase_result is not None:
+                context.phase_results[phase.value] = phase_result
+
+            # After RECON: run WAF detection and store in context
+            if phase is Phase.RECON:
+                context.waf_result = self._detect_waf(target)
+
+            # After each phase: AI analysis -> store AIDecision in context
+            if self._ai_engine is not None and phase_result is not None:
+                try:
+                    ai_decision = self._ai_engine.analyze_phase(
+                        phase.value, phase_result, context
+                    )
+                    context.ai_decisions[phase.value] = ai_decision
+                except Exception as exc:  # noqa: BLE001
+                    self._logger.warning(
+                        f"[OrchestratorV2] AI analysis failed for phase '{phase.value}': {exc}"
+                    )
+
+            # After each phase: persist context via StateBridge
+            if self._config.web_enabled:
+                self._persist_context(context)
+
+    def _detect_waf(self, target: str) -> Any:
+        """Run WafDetector.detect(target) and return WafResult. Never raises."""
+        try:
+            from hackempire.tools.waf.waf_detector import WafDetector  # noqa: PLC0415
+
+            detector = WafDetector()
+            waf_result = detector.detect(target)
+            self._logger.info(
+                f"[OrchestratorV2] WAF detection: detected={waf_result.detected}, "
+                f"vendor={waf_result.vendor}"
+            )
+            return waf_result
+        except Exception as exc:  # noqa: BLE001
+            self._logger.warning(f"[OrchestratorV2] WAF detection failed: {exc}")
+            return None
+
+    def _persist_context(self, context: Any) -> None:
+        """Persist ScanContext via StateBridge. Never raises."""
+        try:
+            from hackempire.web.state_bridge import write_state  # noqa: PLC0415
+
+            def _to_dict(obj: Any) -> Any:
+                return obj.__dict__ if hasattr(obj, "__dict__") else obj
+
+            write_state(
+                target=context.target,
+                mode=context.mode,
+                current_phase="",
+                data={
+                    "phase_results": {
+                        k: _to_dict(v)
+                        for k, v in context.phase_results.items()
+                    },
+                },
+                tool_health=context.tool_health,
+                todo_list=_to_dict(context.todo_list) if context.todo_list is not None else None,
+                ai_decisions={
+                    k: _to_dict(v)
+                    for k, v in context.ai_decisions.items()
+                },
+                waf_result=_to_dict(context.waf_result) if context.waf_result is not None else None,
+            )
+        except Exception as exc:  # noqa: BLE001
+            self._logger.warning(f"[OrchestratorV2] StateBridge persist failed: {exc}")
+
+    def _build_final_report(self, context: Any) -> dict:
+        """Build the final report dict from ScanContext."""
+        return {
+            "target": context.target,
+            "session_id": context.session_id,
+            "mode": context.mode,
+            "started_at": context.started_at,
+            "phase_results": context.phase_results,
+            "waf_result": context.waf_result,
+            "ai_decisions": context.ai_decisions,
+            "todo_list": context.todo_list,
+        }

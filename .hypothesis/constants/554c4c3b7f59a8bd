@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\recon\whatweb_tool.py
+# hypothesis_version: 6.151.9
+
+['--log-json=-', '--quiet', '200', '301', '302', '404', '\\x1b\\[[0-9;]*m', 'detail', 'http', 'https', 'name', 'plugins', 'recon', 'string', 'technologies', 'version', 'whatweb']

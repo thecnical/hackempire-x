@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\core\orchestrator.py
+# hypothesis_version: 6.151.9
+
+[0.2, 15.0, 60.0, 500, '15.0', '4', '60', 'AIEngine | None', 'Config', 'Logger', 'OPENROUTER_BASE_URL', 'OPENROUTER_MODEL', 'OPENROUTER_TIMEOUT_S', 'PhaseManager | None', '__dict__', 'ai_decision', 'ai_decisions', 'already_installed', 'error', 'exploit', 'failed', 'fallback', 'http', 'https', 'lab', 'mode', 'mode != exploit', 'not_installed', 'ok', 'parallel', 'phase', 'phase_results', 'ports', 'pro', 'raw_text', 'reason', 'sequential', 'service', 'session_id', 'skipped', 'start', 'started_at', 'stealth', 'subdomains', 'success', 'target', 'timeout', 'todo_list', 'tool_status', 'tools', 'unknown', 'urls', 'vulnerabilities', 'waf_result']

@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\url_discovery\gauplus_tool.py
+# hypothesis_version: 6.151.9
+
+['(https?://\\S+)', '\\x1b\\[[0-9;]*m', 'gau', 'url_discovery', 'urls']

@@ -78,7 +78,7 @@ def print_scan_info(
     lines: list[str] = [
         f"[bold green]  Target  [/bold green] [white]{target}[/white]",
         f"[bold green]  Mode    [/bold green] [bold yellow]{mode.upper()}[/bold yellow]",
-        f"[bold green]  Web GUI [/bold green] {'[bold cyan]ON  http://127.0.0.1:5000[/bold cyan]' if web else '[dim]OFF[/dim]'}",
+        f"[bold green]  Web GUI [/bold green] {'[bold cyan]ON  https://127.0.0.1:5443[/bold cyan]' if web else '[dim]OFF[/dim]'}",
         f"[bold green]  AI      [/bold green] {'[bold magenta]ENABLED[/bold magenta]' if ai else '[dim]DISABLED[/dim]'}",
         f"[bold green]  Proxy   [/bold green] {'[bold yellow]' + proxy + '[/bold yellow]' if proxy else '[dim]NONE[/dim]'}",
         "",

@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\methodology\xss_methodology.py
+# hypothesis_version: 6.151.9
+
+[0.75, 0.8, '--blind', '--crawl', '--format', '--header', '--headers', '--silence', '--url', 'Reflected XSS', 'XSS', '[+]', 'akamai', 'cloudflare', 'dalfox', 'default', 'high', 'javascript:alert(1)', 'modsecurity', 'plain', 'url', 'waf_result', 'xsstrike']

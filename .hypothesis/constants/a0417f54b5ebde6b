@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\recon\dnsx_tool.py
+# hypothesis_version: 6.151.9
+
+['-a', '-d', '-resp', '-silent', '[', '\\x1b\\[[0-9;]*m', 'dnsx', 'recon', 'subdomains']

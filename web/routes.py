@@ -12,6 +12,14 @@ import io
 
 from web.state_bridge import read_state
 
+EXPORT_MIME_TYPES = {
+    "pdf": "application/pdf",
+    "json": "application/json",
+    "html": "text/html",
+    "markdown": "text/markdown",
+    "csv": "text/csv",
+}
+
 bp = Blueprint("main", __name__)
 
 _LOG_FILE = Path(__file__).resolve().parent.parent / "logs" / "hackempire.log"
@@ -292,3 +300,68 @@ def report_pdf() -> Response:
     # Fallback: serve as HTML if WeasyPrint not installed
     html = generate_html(state)
     return Response(html, mimetype="text/html")
+
+
+@bp.route("/api/export/<fmt>")
+def export_report(fmt: str) -> Response:
+    """Export the scan report in the requested format.
+
+    Supported formats: pdf, json, html, markdown, csv.
+    Returns HTTP 400 with JSON error body for unknown formats.
+    """
+    if fmt not in EXPORT_MIME_TYPES:
+        return jsonify({"error": f"Unknown format: {fmt}"}), 400
+
+    state = read_state()
+    mime = EXPORT_MIME_TYPES[fmt]
+
+    if fmt == "pdf":
+        from web.pdf_report import generate_pdf, generate_html, weasyprint_available
+        if weasyprint_available():
+            pdf_bytes = generate_pdf(state)
+            if pdf_bytes:
+                buf = io.BytesIO(pdf_bytes)
+                buf.seek(0)
+                return send_file(buf, mimetype=mime, as_attachment=True,
+                                 download_name="hackempire_report.pdf")
+        html = generate_html(state)
+        return Response(html, mimetype="text/html")
+
+    if fmt == "json":
+        data = state.get("data", {})
+        vuln = data.get("vuln", {})
+        vulns = vuln.get("vulnerabilities") or []
+        report_data = {
+            "target": state.get("target"),
+            "mode": state.get("mode"),
+            "tool_health": state.get("tool_health"),
+            "findings": {
+                "ports": (data.get("recon") or {}).get("ports") or [],
+                "subdomains": (data.get("recon") or {}).get("subdomains") or [],
+                "urls": (data.get("enum") or {}).get("urls") or [],
+                "vulnerabilities": [
+                    {**v, "severity": _severity_label(_safe_float(v.get("confidence", 0)))}
+                    for v in vulns if isinstance(v, dict)
+                ],
+            },
+        }
+        content = json.dumps(report_data, indent=2, default=str).encode()
+        return Response(content, mimetype=mime)
+
+    if fmt == "html":
+        from web.pdf_report import generate_html
+        html = generate_html(state)
+        return Response(html, mimetype=mime)
+
+    if fmt == "markdown":
+        from web.exporters.markdown_export import generate_markdown
+        content = generate_markdown(state)
+        return Response(content, mimetype=mime)
+
+    if fmt == "csv":
+        from web.exporters.csv_export import generate_csv
+        content = generate_csv(state)
+        return Response(content, mimetype=mime)
+
+    # Should never reach here
+    return jsonify({"error": f"Unknown format: {fmt}"}), 400

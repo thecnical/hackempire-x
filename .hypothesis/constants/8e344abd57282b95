@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\web\app.py
+# hypothesis_version: 6.151.9
+
+[5000, 5443, '*', '127.0.0.1', 'SECRET_KEY', 'SocketIO', '__main__', 'cols', 'data', 'hackempire-dev-key', 'rows', 'session_id', 'socketio', 'static', 'templates', 'terminal_input', 'terminal_resize', 'threading']

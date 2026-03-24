@@ -46,23 +46,93 @@ def _build_parser() -> argparse.ArgumentParser:
             "  python main.py --doctor\n"
             "  python main.py --clean\n"
             "  python main.py --uninstall\n"
+            "  python main.py scan example.com --mode full\n"
+            "  python main.py scan example.com --mode exploit\n"
+            "  python main.py scan example.com --mode stealth --resume\n"
+            "  python main.py report --format json\n"
+            "  python main.py install-tools\n"
+            "  python main.py terminal\n"
+            "  python main.py config ai_key YOUR_KEY\n"
         ),
     )
 
-    # Positional — optional so global commands work without a target
+    subparsers = parser.add_subparsers(dest="subcommand", metavar="COMMAND")
+
+    # ------------------------------------------------------------------
+    # scan subcommand
+    # ------------------------------------------------------------------
+    scan_parser = subparsers.add_parser(
+        "scan",
+        help="Run a scan against a target",
+    )
+    scan_parser.add_argument("target", help="Target domain or IP address")
+    scan_parser.add_argument(
+        "--mode",
+        choices=["recon-only", "full", "exploit", "stealth"],
+        default="full",
+        help="Scan mode (default: full)",
+    )
+    scan_parser.add_argument("--ai-key", dest="ai_key", default=None)
+    scan_parser.add_argument("--web", action="store_true", default=False)
+    scan_parser.add_argument("--proxy", default=None)
+    scan_parser.add_argument(
+        "--resume",
+        action="store_true",
+        default=False,
+        help="Resume a previous scan",
+    )
+
+    # ------------------------------------------------------------------
+    # report subcommand
+    # ------------------------------------------------------------------
+    report_parser = subparsers.add_parser(
+        "report",
+        help="Export the latest scan report",
+    )
+    report_parser.add_argument(
+        "--format",
+        dest="fmt",
+        choices=["pdf", "json", "html", "markdown", "csv"],
+        default="json",
+        help="Output format (default: json)",
+    )
+
+    # ------------------------------------------------------------------
+    # install-tools subcommand
+    # ------------------------------------------------------------------
+    subparsers.add_parser("install-tools", help="Install all registered tools")
+
+    # ------------------------------------------------------------------
+    # terminal subcommand
+    # ------------------------------------------------------------------
+    subparsers.add_parser("terminal", help="Open web terminal in default browser")
+
+    # ------------------------------------------------------------------
+    # config subcommand
+    # ------------------------------------------------------------------
+    config_parser = subparsers.add_parser(
+        "config",
+        help="Set a configuration key/value in .hackempire/config.json",
+    )
+    config_parser.add_argument("key", help="Configuration key")
+    config_parser.add_argument("value", help="Configuration value")
+
+    # ------------------------------------------------------------------
+    # Legacy positional target (kept for backward compatibility)
+    # ------------------------------------------------------------------
     parser.add_argument(
         "target",
         nargs="?",
         default=None,
-        help="Target domain or IP address",
+        help="Target domain or IP address (legacy positional form)",
     )
 
-    # Scan options
+    # Scan options (legacy)
     parser.add_argument(
         "--mode",
         choices=["beginner", "pro", "lab"],
         default=None,
-        help="Execution mode (required for scans)",
+        help="Execution mode (required for legacy scans)",
     )
     parser.add_argument(
         "--ai-key",
@@ -74,7 +144,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--web",
         action="store_true",
         default=False,
-        help="Launch web dashboard at http://127.0.0.1:5000/dashboard",
+        help="Launch web dashboard at https://127.0.0.1:5443/dashboard",
     )
     parser.add_argument(
         "--proxy",
@@ -134,10 +204,39 @@ def run_cli(argv: Optional[list[str]] = None) -> int:
     print_banner(console)
 
     # -----------------------------------------------------------------------
-    # Global utility commands — no target required
+    # New subcommands
     # -----------------------------------------------------------------------
-    from cli.commands import cmd_status, cmd_doctor, cmd_clean, cmd_uninstall
+    from cli.commands import (
+        cmd_status, cmd_doctor, cmd_clean, cmd_uninstall,
+        cmd_scan, cmd_report, cmd_install_tools, cmd_terminal, cmd_config,
+    )
 
+    if args.subcommand == "scan":
+        return cmd_scan(
+            console=console,
+            target=args.target,
+            mode=args.mode,
+            ai_key=args.ai_key,
+            web=args.web,
+            proxy=args.proxy,
+            resume=args.resume,
+        )
+
+    if args.subcommand == "report":
+        return cmd_report(console=console, fmt=args.fmt)
+
+    if args.subcommand == "install-tools":
+        return cmd_install_tools(console=console)
+
+    if args.subcommand == "terminal":
+        return cmd_terminal(console=console)
+
+    if args.subcommand == "config":
+        return cmd_config(console=console, key=args.key, value=args.value)
+
+    # -----------------------------------------------------------------------
+    # Legacy global utility commands — no target required
+    # -----------------------------------------------------------------------
     if args.uninstall:
         return cmd_uninstall(console)
 
@@ -197,11 +296,11 @@ def run_cli(argv: Optional[list[str]] = None) -> int:
             from web.app import run_server
             web_thread = threading.Thread(
                 target=run_server,
-                kwargs={"host": "127.0.0.1", "port": 5000, "debug": False},
+                kwargs={"host": "127.0.0.1", "port": 5443, "debug": False},
                 daemon=True,
             )
             web_thread.start()
-            logger.success("Web dashboard started → http://127.0.0.1:5000/dashboard")
+            logger.success("Web dashboard started → https://127.0.0.1:5443/dashboard")
         except Exception as exc:
             logger.warning(f"Web dashboard failed to start: {exc}")
 
@@ -234,7 +333,7 @@ def run_cli(argv: Optional[list[str]] = None) -> int:
         console.print(
             Panel.fit(
                 "[bold green]All scans complete.[/bold green]  "
-                "[dim]Dashboard → http://127.0.0.1:5000/dashboard[/dim]",
+                "[dim]Dashboard → https://127.0.0.1:5443/dashboard[/dim]",
                 border_style="green",
             )
         )
@@ -332,7 +431,7 @@ def _run_single_target(
     console.print(
         Panel.fit(
             f"[bold green]Scan complete: {target}[/bold green]"
-            + (f"  [dim]Dashboard → http://127.0.0.1:5000/dashboard[/dim]" if web else ""),
+            + (f"  [dim]Dashboard → https://127.0.0.1:5443/dashboard[/dim]" if web else ""),
             border_style="green",
         )
     )

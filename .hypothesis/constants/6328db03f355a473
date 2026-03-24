@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\utils\validator.py
+# hypothesis_version: 6.151.9
+
+[253, '"', '#', '&', '&#x27;', '&amp;', '&gt;', '&lt;', '&quot;', "'", '.', '/', '://', '<', '>', '@', '[;|&$`\\n\\r\\x00]', '\\', 'http://', 'https://', 'replace', 'utf-8']

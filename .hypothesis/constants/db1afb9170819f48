@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\installer\dependency_resolver.py
+# hypothesis_version: 6.151.9
+
+[300, 600, 1800, '#', '-y', '/opt/reconftw', 'already_installed', 'apt', 'apt-get', 'clone', 'failed', 'gem', 'git', 'go', 'install', 'install.sh', 'installed', 'pip', 'reconftw', 'replace', 'requirements.txt', 'ruby', 'skipped']

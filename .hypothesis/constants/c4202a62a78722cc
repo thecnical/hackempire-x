@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\post_exploit\crackmapexec_tool.py
+# hypothesis_version: 6.151.9
+
+['+]', '-m', 'SMB', '[-]', '\\x1b\\[[0-9;]*m', 'crackmapexec', 'findings', 'post_exploit', 'smb']

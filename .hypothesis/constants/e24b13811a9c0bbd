@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\vuln\dalfox_tool.py
+# hypothesis_version: 6.151.9
+
+['--proxy', '--silence', 'XSS', '[POC]', '[VULN]', '\\x1b\\[[0-9;]*m', 'dalfox', 'high', 'name', 'severity', 'title', 'url', 'vuln_scan', 'vulnerabilities']

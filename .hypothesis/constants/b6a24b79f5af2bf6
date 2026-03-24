@@ -1,0 +1,4 @@
+# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\enum\arjun_tool.py
+# hypothesis_version: 6.151.9
+
+['-m', '-u', '\\[.*?\\]\\s+(\\w+)', '\\x1b\\[[0-9;]*m', 'arjun', 'enumeration', 'parameters']
