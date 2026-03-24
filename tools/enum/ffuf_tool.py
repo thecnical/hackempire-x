@@ -16,8 +16,8 @@ class FFUFTool(BaseTool):
     name = "ffuf"
     phase = "enum"
 
-    def __init__(self, *, timeout_s: float, web_scheme: str) -> None:
-        super().__init__(timeout_s=timeout_s)
+    def __init__(self, *, timeout_s: float, web_scheme: str, proxy: str | None = None) -> None:
+        super().__init__(timeout_s=timeout_s, proxy=proxy)
         self._web_scheme = web_scheme
         self._wordlist_path = os.environ.get("FFUF_WORDLIST", "wordlist.txt")
 
@@ -29,7 +29,10 @@ class FFUFTool(BaseTool):
 
     def build_command(self, target: str) -> list[str]:
         base_url = f"{self._web_scheme}://{target}".rstrip("/")
-        return ["ffuf", "-u", f"{base_url}/FUZZ", "-w", self._wordlist_path]
+        cmd = ["ffuf", "-u", f"{base_url}/FUZZ", "-w", self._wordlist_path]
+        if self._proxy:
+            cmd += ["-x", self._proxy]
+        return cmd
 
     def parse_output(self, raw_output: str) -> dict[str, Any]:
         text = ANSI_ESCAPE_RE.sub("", raw_output)

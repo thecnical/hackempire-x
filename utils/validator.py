@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
+from pathlib import Path
 from typing import Final
 
 
@@ -60,4 +61,48 @@ def validate_target(target: str) -> bool:
 
     # Domain validation.
     return _is_valid_domain(candidate)
+
+
+def load_target_file(path: str) -> list[str]:
+    """
+    Read a target file (one target per line) and return a list of valid targets.
+
+    Lines starting with '#' are treated as comments and skipped.
+    Empty lines are skipped.
+    Invalid targets are skipped with a warning printed to stderr.
+
+    Returns:
+        list[str]: Validated, deduplicated targets in file order.
+    """
+    import sys
+
+    file_path = Path(path)
+    if not file_path.exists():
+        print(f"[error] Target file not found: {path}", file=sys.stderr)
+        return []
+    if not file_path.is_file():
+        print(f"[error] Target file path is not a file: {path}", file=sys.stderr)
+        return []
+
+    targets: list[str] = []
+    seen: set[str] = set()
+
+    try:
+        lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError as exc:
+        print(f"[error] Cannot read target file: {exc}", file=sys.stderr)
+        return []
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if not validate_target(line):
+            print(f"[warn] Skipping invalid target in file: '{line}'", file=sys.stderr)
+            continue
+        if line not in seen:
+            seen.add(line)
+            targets.append(line)
+
+    return targets
 

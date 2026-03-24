@@ -139,6 +139,8 @@ def dashboard() -> str:
     subdomains = recon.get("subdomains") or []
     urls = enum.get("urls") or []
     vulns = vuln.get("vulnerabilities") or []
+    technologies = recon.get("technologies") or []
+    cve_findings = recon.get("cve_findings") or []
 
     high_conf_vulns = [
         v for v in vulns
@@ -157,9 +159,13 @@ def dashboard() -> str:
         subdomains_count=len(subdomains),
         urls_count=len(urls),
         vulns_count=len(vulns),
+        cve_count=len(cve_findings),
+        tech_count=len(technologies),
         high_conf_vulns=high_conf_vulns,
         tool_health=tool_health,
         attack_tree=attack_tree,
+        technologies=technologies[:10],
+        cve_findings=cve_findings[:10],
     )
 
 
@@ -179,8 +185,11 @@ def api_logs() -> Response:
 def report() -> str:
     state = read_state()
     data = state.get("data", {})
+    recon = data.get("recon", {})
     vuln = data.get("vuln", {})
     vulns = vuln.get("vulnerabilities") or []
+    cve_findings = recon.get("cve_findings") or []
+    technologies = recon.get("technologies") or []
 
     enriched = []
     for v in vulns:
@@ -194,18 +203,34 @@ def report() -> str:
         })
     enriched.sort(key=lambda x: _safe_float(x.get("confidence", 0)), reverse=True)
 
+    # Enrich CVE findings with severity label
+    enriched_cves = []
+    for c in cve_findings:
+        if not isinstance(c, dict):
+            continue
+        score = _safe_float(c.get("cvss_score", 0))
+        enriched_cves.append({
+            **c,
+            "severity_label": c.get("severity") or _severity_label(score / 10.0),
+        })
+
     ai_decisions = {
         phase: (data.get(phase) or {}).get("ai_decision")
         for phase in ("recon", "enum", "vuln")
     }
+
+    from web.pdf_report import weasyprint_available
 
     return render_template(
         "report.html",
         target=state.get("target", "—"),
         mode=state.get("mode", "—"),
         vulnerabilities=enriched,
+        cve_findings=enriched_cves,
+        technologies=technologies,
         tool_health=state.get("tool_health") or {},
         ai_decisions={k: v for k, v in ai_decisions.items() if v},
+        pdf_available=weasyprint_available(),
     )
 
 
@@ -244,3 +269,26 @@ def report_json() -> Response:
 def api_state() -> Response:
     """Raw state JSON for debugging."""
     return jsonify(read_state())
+
+
+@bp.route("/api/report/pdf")
+def report_pdf() -> Response:
+    """Generate and download a PDF report."""
+    from web.pdf_report import generate_pdf, generate_html, weasyprint_available
+    state = read_state()
+
+    if weasyprint_available():
+        pdf_bytes = generate_pdf(state)
+        if pdf_bytes:
+            buf = io.BytesIO(pdf_bytes)
+            buf.seek(0)
+            return send_file(
+                buf,
+                mimetype="application/pdf",
+                as_attachment=True,
+                download_name="hackempire_report.pdf",
+            )
+
+    # Fallback: serve as HTML if WeasyPrint not installed
+    html = generate_html(state)
+    return Response(html, mimetype="text/html")

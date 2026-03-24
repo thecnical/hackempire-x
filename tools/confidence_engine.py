@@ -16,6 +16,7 @@ _TOOL_BASE_CONFIDENCE: dict[str, float] = {
     "nuclei": 0.85,
     "nmap": 0.75,
     "subfinder": 0.65,
+    "whatweb": 0.70,
     "ffuf": 0.60,
     "dirsearch": 0.60,
 }

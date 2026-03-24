@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import abc
+import os
 import subprocess
-from typing import Any
+from typing import Any, Optional
 
 
 class ToolExecutionError(RuntimeError):
@@ -30,8 +31,11 @@ class BaseTool(abc.ABC):
     name: str
     phase: str
 
-    def __init__(self, *, timeout_s: float) -> None:
+    def __init__(self, *, timeout_s: float, proxy: Optional[str] = None) -> None:
         self._timeout_s = timeout_s
+        # Proxy URL (e.g. "http://127.0.0.1:8080") — injected by ToolManager.
+        # Tools that support proxy flags should read self._proxy in build_command().
+        self._proxy: Optional[str] = proxy or os.environ.get("HACKEMPIRE_PROXY")
 
     @abc.abstractmethod
     def check_installed(self) -> bool:
@@ -54,6 +58,21 @@ class BaseTool(abc.ABC):
     def parse_output(self, raw_output: str) -> dict[str, Any]:
         raise NotImplementedError
 
+    def _build_proxy_env(self) -> dict[str, str] | None:
+        """
+        Return an env dict with HTTP_PROXY/HTTPS_PROXY set if a proxy is configured.
+        Tools that don't support --proxy flags can use this via subprocess env.
+        """
+        if not self._proxy:
+            return None
+        import os as _os
+        env = dict(_os.environ)
+        env["http_proxy"] = self._proxy
+        env["https_proxy"] = self._proxy
+        env["HTTP_PROXY"] = self._proxy
+        env["HTTPS_PROXY"] = self._proxy
+        return env
+
     def run(self, target: str) -> dict[str, Any]:
         if not self.check_installed():
             raise ToolNotInstalledError(f"Tool '{self.name}' is not installed or not available.")
@@ -65,6 +84,8 @@ class BaseTool(abc.ABC):
         if not cmd:
             raise ToolExecutionError(f"Tool '{self.name}' is not applicable for the given target.")
 
+        proxy_env = self._build_proxy_env()
+
         try:
             proc = subprocess.run(
                 cmd,
@@ -73,6 +94,7 @@ class BaseTool(abc.ABC):
                 text=True,
                 timeout=self._timeout_s,
                 check=False,
+                env=proxy_env,  # None means inherit current env (no proxy)
             )
         except subprocess.TimeoutExpired as exc:
             raise ToolTimeoutError(f"Tool '{self.name}' timed out after {self._timeout_s}s") from exc
@@ -81,7 +103,6 @@ class BaseTool(abc.ABC):
 
         raw_output = proc.stdout or ""
         if proc.returncode != 0 and not raw_output.strip():
-            # If the tool failed and didn't print anything, treat as failure.
             raise ToolExecutionError(
                 f"Tool '{self.name}' failed with exit code {proc.returncode} (no output)."
             )

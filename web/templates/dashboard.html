@@ -18,8 +18,10 @@
       ('Subdomains',   subdomains_count, '&#127760;'),
       ('URLs',         urls_count,       '&#128279;'),
       ('Vulns',        vulns_count,      '&#9888;'),
+      ('CVEs',         cve_count,        '&#128737;'),
+      ('Technologies', tech_count,       '&#128187;'),
   ] %}
-  <div class="col-6 col-md-3">
+  <div class="col-6 col-md-2">
     <div class="card stat-card text-center p-3">
       <div style="font-size:1.6rem;">{{ icon }}</div>
       <div class="display-6 fw-bold">{{ value }}</div>
@@ -117,4 +119,62 @@
     </div>
   </div>
 </div>
+
+<!-- Technology Fingerprint -->
+{% if technologies %}
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">Technology Fingerprint</div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Technology</th><th>Version</th><th>Detail</th></tr></thead>
+          <tbody>
+          {% for t in technologies %}
+          <tr>
+            <td><span class="badge bg-primary">{{ t.name }}</span></td>
+            <td class="text-muted small">{{ t.get('version', '—') }}</td>
+            <td class="text-muted small">{{ t.get('detail', '—') }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- CVE Findings -->
+{% if cve_findings %}
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header" style="color:#da3633;">CVE Correlation</div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>CVE ID</th><th>Service</th><th>Port</th><th>Severity</th><th>CVSS</th><th>Description</th></tr></thead>
+          <tbody>
+          {% for c in cve_findings %}
+          {% set score = c.get('cvss_score', 0)|float %}
+          {% if score >= 9.0 %}{% set sev = 'critical' %}
+          {% elif score >= 7.0 %}{% set sev = 'high' %}
+          {% elif score >= 4.0 %}{% set sev = 'medium' %}
+          {% else %}{% set sev = 'low' %}{% endif %}
+          <tr>
+            <td><strong style="color:#58a6ff;">{{ c.get('cve_id','—') }}</strong></td>
+            <td>{{ c.get('service','—') }}</td>
+            <td>{{ c.get('port','—') }}</td>
+            <td><span class="badge badge-{{ sev }}">{{ sev }}</span></td>
+            <td>{{ score }}</td>
+            <td class="text-muted small" style="max-width:300px;">{{ (c.get('description') or '')[:120] }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

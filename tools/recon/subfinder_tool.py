@@ -12,8 +12,8 @@ class SubfinderTool(BaseTool):
     name = "subfinder"
     phase = "recon"
 
-    def __init__(self, *, timeout_s: float, web_scheme: str) -> None:
-        super().__init__(timeout_s=timeout_s)
+    def __init__(self, *, timeout_s: float, web_scheme: str, proxy: str | None = None) -> None:
+        super().__init__(timeout_s=timeout_s, proxy=proxy)
 
     def check_installed(self) -> bool:
         return shutil.which("subfinder") is not None

@@ -4,6 +4,8 @@ Cyberpunk/hacker aesthetic using Rich. Safe on all terminals including Kali Linu
 """
 from __future__ import annotations
 
+from typing import Optional
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -70,6 +72,7 @@ def print_scan_info(
     mode: str,
     web: bool = False,
     ai: bool = False,
+    proxy: Optional[str] = None,
 ) -> None:
     """Render the pre-scan info panel."""
     lines: list[str] = [
@@ -77,6 +80,7 @@ def print_scan_info(
         f"[bold green]  Mode    [/bold green] [bold yellow]{mode.upper()}[/bold yellow]",
         f"[bold green]  Web GUI [/bold green] {'[bold cyan]ON  http://127.0.0.1:5000[/bold cyan]' if web else '[dim]OFF[/dim]'}",
         f"[bold green]  AI      [/bold green] {'[bold magenta]ENABLED[/bold magenta]' if ai else '[dim]DISABLED[/dim]'}",
+        f"[bold green]  Proxy   [/bold green] {'[bold yellow]' + proxy + '[/bold yellow]' if proxy else '[dim]NONE[/dim]'}",
         "",
         "[dim]  Initializing scan engine...[/dim]",
     ]

@@ -16,8 +16,8 @@ class DirsearchTool(BaseTool):
     name = "dirsearch"
     phase = "enum"
 
-    def __init__(self, *, timeout_s: float, web_scheme: str) -> None:
-        super().__init__(timeout_s=timeout_s)
+    def __init__(self, *, timeout_s: float, web_scheme: str, proxy: str | None = None) -> None:
+        super().__init__(timeout_s=timeout_s, proxy=proxy)
         self._web_scheme = web_scheme
         self._script_path = os.environ.get("DIRSEARCH_SCRIPT", "dirsearch.py")
 

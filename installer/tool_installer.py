@@ -48,6 +48,7 @@ TOOL_INSTALL_SPECS: dict[str, ToolInstallSpec] = {
     "subfinder": ToolInstallSpec(name="subfinder", method="apt", package="subfinder"),
     "nuclei": ToolInstallSpec(name="nuclei", method="apt", package="nuclei"),
     "ffuf": ToolInstallSpec(name="ffuf", method="apt", package="ffuf"),
+    "whatweb": ToolInstallSpec(name="whatweb", method="apt", package="whatweb"),
     "dirsearch": ToolInstallSpec(
         name="dirsearch",
         method="git",

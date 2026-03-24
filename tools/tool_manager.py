@@ -28,6 +28,7 @@ from utils.logger import Logger
 
 from tools.recon.nmap_tool import NmapTool
 from tools.recon.subfinder_tool import SubfinderTool
+from tools.recon.whatweb_tool import WhatWebTool
 from tools.enum.dirsearch_tool import DirsearchTool
 from tools.enum.ffuf_tool import FFUFTool
 from tools.vuln.nuclei_tool import NucleiTool
@@ -48,7 +49,7 @@ class ToolManager:
     """
 
     TOOL_REGISTRY: dict[str, list[type[BaseTool]]] = {
-        Phase.RECON.value: [NmapTool, SubfinderTool],
+        Phase.RECON.value: [NmapTool, SubfinderTool, WhatWebTool],
         Phase.ENUM.value: [DirsearchTool, FFUFTool],
         Phase.VULN.value: [NucleiTool],
     }
@@ -62,12 +63,14 @@ class ToolManager:
         max_workers: int,
         web_scheme: str,
         health_tracker: Optional[ToolHealthTracker] = None,
+        proxy: Optional[str] = None,
     ) -> None:
         self._logger = logger
         self._timeout_s = timeout_s
         self._execution_mode = execution_mode
         self._max_workers = max_workers
         self._web_scheme = web_scheme
+        self._proxy = proxy
         # Shared health tracker — injected or created locally.
         self._health_tracker: ToolHealthTracker = health_tracker or ToolHealthTracker()
 
@@ -142,6 +145,19 @@ class ToolManager:
 
         normalized["tool_status"] = phase_tool_status
 
+        # CVE Correlation — run after recon to map open ports → CVEs
+        if phase == Phase.RECON and normalized["ports"]:
+            self._logger.info("[cve] Running CVE correlation on open ports...")
+            try:
+                from tools.recon.cve_correlator import CVECorrelator
+                correlator = CVECorrelator(logger=self._logger, proxy=self._proxy)
+                cve_findings = correlator.correlate(normalized["ports"])
+                normalized["cve_findings"] = cve_findings
+                self._logger.info(f"[cve] {len(cve_findings)} CVE(s) correlated.")
+            except Exception as exc:
+                self._logger.warning(f"[cve] CVE correlation failed (non-fatal): {exc}")
+                normalized["cve_findings"] = []
+
         # Persist health into the shared tracker.
         self._health_tracker.merge_phase_status(phase_tool_status)
 
@@ -188,7 +204,7 @@ class ToolManager:
 
     def _instantiate_tools(self, tool_classes: list[type[BaseTool]]) -> list[BaseTool]:
         return [
-            cls(timeout_s=self._timeout_s, web_scheme=self._web_scheme)  # type: ignore[arg-type]
+            cls(timeout_s=self._timeout_s, web_scheme=self._web_scheme, proxy=self._proxy)  # type: ignore[arg-type]
             for cls in tool_classes
         ]
 

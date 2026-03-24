@@ -72,6 +72,7 @@ class Orchestrator:
             max_workers=max_workers,
             web_scheme=web_scheme,
             health_tracker=self._health_tracker,
+            proxy=self._config.proxy,
         )
 
         if self._config.ai_key:

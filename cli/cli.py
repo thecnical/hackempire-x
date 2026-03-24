@@ -76,6 +76,20 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Launch web dashboard at http://127.0.0.1:5000/dashboard",
     )
+    parser.add_argument(
+        "--proxy",
+        dest="proxy",
+        default=None,
+        metavar="URL",
+        help="Route all tool traffic through a proxy (e.g. http://127.0.0.1:8080 for Burp Suite)",
+    )
+    parser.add_argument(
+        "--target-file",
+        dest="target_file",
+        default=None,
+        metavar="FILE",
+        help="Path to a file containing one target per line (multi-target mode)",
+    )
 
     # Global utility commands
     parser.add_argument(
@@ -139,7 +153,7 @@ def run_cli(argv: Optional[list[str]] = None) -> int:
     # -----------------------------------------------------------------------
     # Scan mode — target + mode are required
     # -----------------------------------------------------------------------
-    if args.target is None:
+    if args.target is None and args.target_file is None:
         parser.print_help()
         return 0
 
@@ -150,36 +164,30 @@ def run_cli(argv: Optional[list[str]] = None) -> int:
 
     logger = Logger(console=console)
 
-    try:
-        target = args.target.strip()
-        mode = args.mode.strip().lower()
+    # Build target list
+    from utils.validator import validate_target, load_target_file
 
-        if not validate_target(target):
+    targets: list[str] = []
+
+    if args.target_file:
+        targets = load_target_file(args.target_file)
+        if not targets:
+            logger.error("No valid targets found in target file.")
+            return 2
+        logger.success(f"Loaded {len(targets)} target(s) from {args.target_file}")
+    else:
+        raw_target = (args.target or "").strip()
+        if not validate_target(raw_target):
             logger.error("Invalid target. Provide a valid domain name or IP address.")
             return 2
-
+        targets = [raw_target]
         logger.success("Target validated")
 
-        print_scan_info(
-            console,
-            target=target,
-            mode=mode,
-            web=args.web,
-            ai=bool(args.ai_key),
-        )
+    mode = args.mode.strip().lower()
+    proxy = args.proxy or None
 
-        config = Config(
-            target=target,
-            mode=mode,
-            ai_key=args.ai_key,
-            web_enabled=bool(args.web),
-        )
-
-    except SystemExit:
-        raise
-    except Exception as exc:
-        logger.error("Failed to prepare configuration", exc=exc)
-        return 1
+    if proxy:
+        logger.success(f"Proxy configured: {proxy}")
 
     # -----------------------------------------------------------------------
     # Web GUI — start before scan so dashboard is ready immediately
@@ -198,8 +206,76 @@ def run_cli(argv: Optional[list[str]] = None) -> int:
             logger.warning(f"Web dashboard failed to start: {exc}")
 
     # -----------------------------------------------------------------------
-    # Phase progress tracking
+    # Multi-target loop
     # -----------------------------------------------------------------------
+    overall_exit = 0
+    for idx, target in enumerate(targets):
+        if len(targets) > 1:
+            console.print(
+                Panel.fit(
+                    f"[bold cyan]Target {idx + 1}/{len(targets)}: {target}[/bold cyan]",
+                    border_style="cyan",
+                )
+            )
+
+        exit_code = _run_single_target(
+            console=console,
+            logger=logger,
+            target=target,
+            mode=mode,
+            ai_key=args.ai_key,
+            web=args.web,
+            proxy=proxy,
+        )
+        if exit_code != 0:
+            overall_exit = exit_code
+
+    if args.web:
+        console.print(
+            Panel.fit(
+                "[bold green]All scans complete.[/bold green]  "
+                "[dim]Dashboard → http://127.0.0.1:5000/dashboard[/dim]",
+                border_style="green",
+            )
+        )
+    return overall_exit
+
+
+# ---------------------------------------------------------------------------
+# Single-target scan runner (called once per target in multi-target mode)
+# ---------------------------------------------------------------------------
+
+def _run_single_target(
+    *,
+    console: Console,
+    logger: Logger,
+    target: str,
+    mode: str,
+    ai_key: Optional[str],
+    web: bool,
+    proxy: Optional[str],
+) -> int:
+    try:
+        print_scan_info(
+            console,
+            target=target,
+            mode=mode,
+            web=web,
+            ai=bool(ai_key),
+            proxy=proxy,
+        )
+
+        config = Config(
+            target=target,
+            mode=mode,
+            ai_key=ai_key,
+            web_enabled=web,
+            proxy=proxy,
+        )
+    except Exception as exc:
+        logger.error("Failed to prepare configuration", exc=exc)
+        return 1
+
     phase_names = [Phase.RECON.value, Phase.ENUM.value, Phase.VULN.value]
     task_ids: dict[str, int] = {}
     _progress_ref: list[Progress] = []
@@ -223,7 +299,7 @@ def run_cli(argv: Optional[list[str]] = None) -> int:
 
     console.print(
         Panel.fit(
-            "[bold cyan]Starting scan orchestration...[/bold cyan]",
+            f"[bold cyan]Starting scan: {target}[/bold cyan]",
             border_style="cyan",
         )
     )
@@ -255,8 +331,8 @@ def run_cli(argv: Optional[list[str]] = None) -> int:
 
     console.print(
         Panel.fit(
-            "[bold green]Scan complete.[/bold green]  "
-            + ("[dim]Dashboard → http://127.0.0.1:5000/dashboard[/dim]" if args.web else ""),
+            f"[bold green]Scan complete: {target}[/bold green]"
+            + (f"  [dim]Dashboard → http://127.0.0.1:5000/dashboard[/dim]" if web else ""),
             border_style="green",
         )
     )
