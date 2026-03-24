@@ -16,10 +16,21 @@ venv/
 env/
 .env/
 
-# HackEmpire X runtime files
+# HackEmpire X runtime files (never commit these)
 logs/hackempire.log
 logs/scan_state.json
 logs/scan_state.tmp
+logs/*.log
+logs/*.json
+logs/*.tmp
+
+# Kiro IDE internal files (not needed in repo)
+.kiro/
+
+# Local pycache (belt-and-suspenders)
+**/__pycache__/
+**/*.pyc
+**/*.pyo
 
 # Environment / secrets
 .env
