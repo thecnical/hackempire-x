@@ -147,23 +147,41 @@ git clone https://github.com/thecnical/hackempire-x.git
 cd hackempire-x
 ```
 
-**2. Run the setup script (recommended)**
+**2. Run the setup script**
 
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-The setup script will:
-- Verify Python 3.11+
-- Install pip dependencies (`rich`, `requests`, `flask`)
-- Optionally install system tools (nmap, subfinder, nuclei, ffuf, dirsearch)
-- Run a full status check
+The setup script automatically:
+- Verifies Python 3.11+
+- Creates an isolated virtual environment at `.venv/` (fixes Kali PEP 668 error)
+- Installs all pip dependencies inside the venv (`rich`, `requests`, `flask`, `weasyprint`)
+- Optionally installs system tools via apt (nmap, subfinder, nuclei, ffuf, whatweb, dirsearch)
+- Creates a `./hackempire` launcher that auto-activates the venv
+- Runs a full status check
 
-**3. Manual install (alternative)**
+> This approach is required on Kali Linux 2024+ (Python 3.13) which blocks system-wide `pip install` by default.
+
+**3. Run it**
 
 ```bash
+# Recommended — launcher handles venv automatically
+./hackempire example.com --mode pro
+
+# Or activate venv manually
+source .venv/bin/activate
+python main.py example.com --mode pro
+```
+
+**4. Manual install (if you prefer)**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+python main.py example.com --mode pro
 ```
 
 ---
@@ -173,26 +191,39 @@ pip install -r requirements.txt
 ### Basic scan
 
 ```bash
-python main.py example.com --mode pro
+./hackempire example.com --mode pro
+# or: python main.py example.com --mode pro
 ```
 
 ### Scan with live web dashboard
 
 ```bash
-python main.py example.com --mode pro --web
+./hackempire example.com --mode pro --web
 # Open: http://127.0.0.1:5000/dashboard
 ```
 
 ### Full AI-assisted scan
 
 ```bash
-python main.py example.com --mode lab --ai-key YOUR_OPENROUTER_KEY --web
+./hackempire example.com --mode lab --ai-key YOUR_OPENROUTER_KEY --web
 ```
 
 ### Beginner mode (guided, verbose)
 
 ```bash
-python main.py example.com --mode beginner
+./hackempire example.com --mode beginner
+```
+
+### Multi-target scan from file
+
+```bash
+./hackempire --target-file targets.txt --mode pro --web
+```
+
+### Route through Burp Suite proxy
+
+```bash
+./hackempire example.com --mode pro --proxy http://127.0.0.1:8080
 ```
 
 ### Using environment variables (recommended for CI/automation)
@@ -201,7 +232,7 @@ python main.py example.com --mode beginner
 export OPENROUTER_API_KEY=your_key
 export HACKEMPIRE_MAX_WORKERS=8
 export HACKEMPIRE_TOOL_TIMEOUT_S=120
-python main.py example.com --mode pro --web
+./hackempire example.com --mode pro --web
 ```
 
 ---
@@ -210,13 +241,15 @@ python main.py example.com --mode pro --web
 
 | Command | Description |
 |---|---|
-| `python main.py <target> --mode pro` | Run a full 3-phase scan |
-| `python main.py <target> --mode pro --web` | Scan + launch live web dashboard |
-| `python main.py <target> --mode lab --ai-key KEY` | Scan with AI orchestration |
-| `python main.py --status` | Show tool and system installation status |
-| `python main.py --doctor` | Diagnose and auto-fix broken tools |
-| `python main.py --clean` | Clear logs and temp files |
-| `python main.py --uninstall` | Fully remove HackEmpire X |
+| `./hackempire <target> --mode pro` | Run a full 3-phase scan |
+| `./hackempire <target> --mode pro --web` | Scan + launch live web dashboard |
+| `./hackempire <target> --mode lab --ai-key KEY` | Scan with AI orchestration |
+| `./hackempire <target> --mode pro --proxy http://127.0.0.1:8080` | Scan through Burp Suite |
+| `./hackempire --target-file targets.txt --mode pro` | Scan multiple targets from file |
+| `./hackempire --status` | Show tool and system installation status |
+| `./hackempire --doctor` | Diagnose and auto-fix broken tools |
+| `./hackempire --clean` | Clear logs and temp files |
+| `./hackempire --uninstall` | Fully remove HackEmpire X |
 
 ### Scan Modes
 
