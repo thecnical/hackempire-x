@@ -1,11 +1,11 @@
-```
+﻿```
  _   _            _     _____                 _            __  __
 | | | | __ _  ___| | __| ____|_ __ ___  _ __ (_)_ __   ___  \ \/ /
 | |_| |/ _` |/ __| |/ /|  _| | '_ ` _ \| '_ \| | '__/ _ \  \  /
 |  _  | (_| | (__|   < | |___| | | | | | |_) | | | |  __/  /  \
 |_| |_|\__,_|\___|_|\_\|_____|_| |_| |_| .__/|_|_|  \___| /_/\_\
                                         |_|
-  AI-Orchestrated Pentesting Platform  ·  Made by Chandan Pandey
+  AI-Orchestrated Web Penetration Testing Platform  v2.0
 ```
 
 <div align="center">
@@ -13,226 +13,177 @@
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=flat-square&logo=python)
 ![Platform](https://img.shields.io/badge/Platform-Kali%20Linux-557C94?style=flat-square&logo=linux)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
-![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=flat-square)
+![Tests](https://img.shields.io/badge/Tests-84%20passing-brightgreen?style=flat-square)
 ![AI](https://img.shields.io/badge/AI-OpenRouter%20LLM-purple?style=flat-square)
+![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=flat-square)
 
 </div>
 
 ---
 
-## What is HackEmpire X?
-
-HackEmpire X is a **modular, AI-orchestrated pentesting platform** built for security professionals, red teamers, and researchers. It automates the full **Recon → Enumeration → Vulnerability Scanning** pipeline, feeds every result into an AI decision engine, and surfaces everything through a live web dashboard with downloadable reports.
-
-Built for **Kali Linux**. Designed for **speed, accuracy, and security**.
-
-> **Legal Notice:** HackEmpire X is built for ethical security research and authorized penetration testing only. Always obtain written permission before scanning any target. Unauthorized use is illegal.
+> **Legal Notice:** HackEmpire X is for ethical security research and authorized penetration testing only. Always obtain explicit written permission before scanning any target. Unauthorized use is illegal.
 
 ---
 
-## Core Architecture
+## What is HackEmpire X?
+
+HackEmpire X is a **master-level automated web penetration testing and bug bounty platform**. It runs a full 7-phase pipeline from recon to reporting, with 6 tools per phase and automatic fallback if any tool fails. Every result feeds into an AI decision engine that guides the next phase. Everything streams live to a real-time web dashboard with an embedded terminal.
+
+Built for **Kali Linux**. Designed for **bug bounty hunters, red teamers, and security researchers**.
+
+---
+
+## Architecture
 
 ```
-Target Input
-    │
-    ▼
-┌─────────────────────────────────────────────────────┐
-│                    Orchestrator                      │
-│  Phase 1: RECON  →  Phase 2: ENUM  →  Phase 3: VULN │
-│       ↕                  ↕                  ↕        │
-│              AI Decision Engine (LLM)                │
-│       ↕                  ↕                  ↕        │
-│         State Manager  ←→  Context Builder           │
-└─────────────────────────────────────────────────────┘
-    │                                         │
-    ▼                                         ▼
-Tool Engine                            Web Dashboard
-(nmap, subfinder,                   (Flask · Bootstrap)
- nuclei, ffuf,                      Live stats · Logs
- dirsearch)                         Reports · Attack Tree
+Target
+  |
+  v
++------------------------------------------------------------------+
+|                        OrchestratorV2                            |
+|                                                                  |
+|  Phase 1: RECON -> Phase 2: URL_DISCOVERY -> Phase 3: ENUM      |
+|  Phase 4: VULN_SCAN -> Phase 5: EXPLOITATION -> Phase 6: POST   |
+|  Phase 7: REPORTING                                              |
+|                                                                  |
+|  Each phase: FallbackChain(tool1->tool2->...->tool6->AegisBridge)|
+|                        |                                         |
+|            AIEngine (OpenRouter LLM)                             |
+|                        |                                         |
+|         WafDetector -> WafBypassStrategy                         |
+|                        |                                         |
+|         TorManager (stealth mode via proxychains4)               |
+|                        |                                         |
+|         TodoPlanner -> RealTimeEmitter (SocketIO)                |
++------------------------------------------------------------------+
+         |                                    |
+         v                                    v
+   Rich CLI (TLS)                   Web Dashboard (HTTPS :5443)
+   4 scan modes                     xterm.js terminal
+   5 report formats                 Chart.js phase rings
+                                    Live vuln feed
 ```
 
 ---
 
 ## Features
 
-### Scan Engine
-- **3-Phase Pipeline** — Recon → Enum → Vuln with smart skip logic (no wasted cycles)
-- **Parallel Execution** — ThreadPoolExecutor with configurable worker count
-- **Smart Phase Skipping** — Skips downstream phases if recon yields no open ports or web hints
-- **Per-Tool Timeouts** — Every subprocess is hard-capped; no hanging scans
-- **Confidence Scoring** — Every finding is scored and corroboration-boosted across tools
-- **Deduplication Engine** — Ports, subdomains, URLs, and vulns deduplicated and normalized
+### 7-Phase Pipeline
+- **RECON** - subfinder, httpx, dnsx, nmap, whatweb, reconftw
+- **URL_DISCOVERY** - katana, gauplus, waybackurls, hakrawler, gau, gospider
+- **ENUMERATION** - feroxbuster, ffuf, dirsearch, arjun, gobuster, wfuzz
+- **VULN_SCAN** - nuclei, nikto, dalfox, sqlmap, ghauri, commix
+- **EXPLOITATION** - sqlmap full chain, commix, dalfox, xsstrike, ghauri, metasploit (gated)
+- **POST_EXPLOIT** - linpeas, crackmapexec, chisel, sliver (gated + consent), mimikatz, bloodhound
+- **REPORTING** - PDF, JSON, HTML, Markdown, CSV
 
-### AI Orchestration
-- **OpenRouter-Compatible** — Works with any LLM (Llama 3, GPT-4, Mistral, Claude, etc.)
-- **Phase-Aware Prompts** — Structured prompts built from live scan context per phase
-- **Tool Prioritization** — AI suggests which tools to run next based on findings
-- **Fallback Safety** — If AI fails or returns garbage, scan continues uninterrupted
-- **Confidence Extraction** — AI decisions include confidence scores and next-phase hints
+### FallbackChain
+Every phase runs 6 tools in order. If a tool fails, times out, or is not installed, the next one takes over automatically. If all 6 fail, AegisBridge runs as a last-resort fallback. The scan never stops due to a single tool failure.
 
-### Security Hardening
-- **No `shell=True`** — All subprocess calls use list args (zero shell injection risk)
-- **Input Validation** — Target domain/IP validated before any tool is invoked
-- **API Key via Env Var** — Never hardcoded; passed via `--ai-key` or `OPENROUTER_API_KEY`
-- **Immutable Config** — Runtime config is a frozen dataclass (no mutation mid-scan)
-- **Subprocess Sandboxing** — stdout/stderr captured; no terminal passthrough
+### AI Engine
+- Generates a 7-phase x 6-task todo list at scan start
+- Analyzes each phase result and decides next steps
+- Suggests exploits based on discovered vulnerabilities
+- Falls back to built-in PentestKnowledgeBase (OWASP Top 10, API Security Top 10) if the API is unavailable
+- Prompt injection prevention: all tool output is JSON-parsed before being sent to the AI
 
-### Installer & Health
-- **Auto-Install Engine** — Detects missing tools, installs via apt/pip/git with permission prompt
-- **Tool Doctor** — Diagnoses broken tools, attempts auto-fix (reinstall, chmod), generates reports
-- **Dependency Checker** — Validates Python version, pip packages, and env vars before every run
-- **Health Tracker** — Per-tool status tracked across the full scan lifecycle
+### WAF Detection and Bypass
+- Detects WAF vendor via wafw00f
+- Per-vendor tamper script chains for sqlmap (Cloudflare, Akamai, AWS WAF, Imperva, F5, Sucuri, ModSecurity)
+- Per-vendor bypass headers for nuclei and other tools
+- Automatic fallback to generic bypass when no WAF is detected
 
-### Web Dashboard
-- **Live Dashboard** — Real-time stats: ports, subdomains, URLs, vulns, tool health
-- **Attack Tree View** — Visual nested tree of findings per phase
-- **Log Viewer** — Auto-refreshing log stream (polls every 3 seconds)
-- **Report Page** — Full vuln table with severity, affected targets, recommendations
-- **JSON Export** — One-click download of the complete structured scan report
+### XSS Methodology
+- Reflected XSS - dalfox + xsstrike with WAF bypass headers
+- Stored XSS - form field injection
+- DOM XSS - jsluice + jsvulns source/sink analysis
+- Blind XSS - nuclei blind-xss templates
+- CSP Bypass - JSONP endpoints, nonce detection, unsafe-inline/eval
 
-### CLI Experience
-- **Rich-Powered Banner** — Cyberpunk ASCII art with colored output
-- **Spinner Progress Bars** — Per-phase spinners with elapsed time
-- **Global Commands** — `--status`, `--doctor`, `--clean`, `--uninstall`
-- **Zero Crash Policy** — Every phase wrapped in graceful error handling
+### SQLi Methodology
+All 7 sqlmap techniques: Boolean-based, Error-based, Union-based, Stacked queries, Time-based, Inline queries, Out-of-band. Plus second-order injection and privilege escalation.
 
----
+### Stealth Mode
+- Routes all tool traffic through Tor via proxychains4
+- Rate limited to 2 rps with 500-3000ms random jitter
+- Automatic identity rotation via NEWNYM signal
 
-## Roadmap — Planned Features
+### Isolated Environments
+- Each Python-based tool runs in its own venv (no dependency conflicts)
+- Go tools installed via go install
+- Ruby tools installed via gem
+- Git-cloned tools get their own venv from their requirements.txt
 
-These are the next high-impact features planned for HackEmpire X:
-
-| # | Feature | Impact |
-|---|---------|--------|
-| 1 | **CVE Correlation Engine** — map open ports/services to known CVEs via NVD API | Critical |
-| 2 | **Shodan / Censys Integration** — passive recon without touching the target | High |
-| 3 | **Screenshot Engine** — auto-capture web screenshots via `gowitness` or `aquatone` | High |
-| 4 | **Custom Wordlist Manager** — per-target wordlist selection based on tech stack detected | High |
-| 5 | **Technology Fingerprinting** — detect CMS, frameworks, WAF via `whatweb` / `wappalyzer` | High |
-| 6 | **Exploit Suggester** — map vulns to Metasploit modules and PoC links | High |
-| 7 | **PDF Report Generator** — export full scan report as styled PDF via `weasyprint` | Medium |
-| 8 | **Slack / Discord Alerts** — push critical findings to webhook in real time | Medium |
-| 9 | **Scan Profiles** — save and reuse custom scan configs (wordlists, tools, timeouts) | Medium |
-| 10 | **Multi-Target Mode** — scan a list of targets from a file (`--target-file targets.txt`) | Medium |
-| 11 | **Rate Limiting Controls** — per-tool request throttling to avoid detection/bans | Medium |
-| 12 | **Proxy Support** — route all tool traffic through Burp Suite or SOCKS5 proxy | Medium |
-| 13 | **Historical Scan Diff** — compare current scan vs previous to highlight new findings | Medium |
-| 14 | **Plugin System** — drop custom tools into `tools/custom/` and they auto-register | Medium |
-| 15 | **AI Chat Mode** — interactive post-scan Q&A with the AI about findings | Low |
+### Real-Time Dashboard
+- Live vulnerability feed via SocketIO
+- Phase progress rings (Chart.js)
+- AI Decision Panel
+- Embedded xterm.js terminal (PTY-backed)
+- Auto-reconnect with state replay on disconnect
+- TLS on port 5443 (self-signed cert auto-generated)
 
 ---
 
-## Tech Stack
+## Installation
 
-| Layer | Technology |
-|---|---|
-| Language | Python 3.11+ |
-| CLI | argparse + Rich |
-| AI Client | OpenRouter API (any LLM) |
-| Scan Tools | nmap, subfinder, nuclei, ffuf, dirsearch |
-| Web GUI | Flask 3 + Bootstrap 5 |
-| State | Thread-safe JSON file bridge |
-| Concurrency | ThreadPoolExecutor |
-| Packaging | pip + requirements.txt |
-
----
-
-## Installation (Kali Linux)
-
-**1. Clone the repository**
+**Requirements:** Kali Linux (or any Debian-based distro), Python 3.11+, Go 1.21+, Ruby 3+
 
 ```bash
 git clone https://github.com/thecnical/hackempire-x.git
 cd hackempire-x
-```
-
-**2. Run the setup script**
-
-```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-The setup script automatically:
-- Verifies Python 3.11+
-- Creates an isolated virtual environment at `.venv/` (fixes Kali PEP 668 error)
-- Installs all pip dependencies inside the venv (`rich`, `requests`, `flask`, `weasyprint`)
-- Optionally installs system tools via apt (nmap, subfinder, nuclei, ffuf, whatweb, dirsearch)
-- Creates a `./hackempire` launcher that auto-activates the venv
-- Runs a full status check
+The setup script creates an isolated venv, installs pip dependencies, and optionally installs system tools via apt.
 
-> This approach is required on Kali Linux 2024+ (Python 3.13) which blocks system-wide `pip install` by default.
-
-**3. Run it**
+**Install all pentest tools:**
 
 ```bash
-# Recommended — launcher handles venv automatically
-./hackempire example.com --mode pro
-
-# Or activate venv manually
-source .venv/bin/activate
-python main.py example.com --mode pro
+python main.py install-tools
 ```
 
-**4. Manual install (if you prefer)**
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python main.py example.com --mode pro
-```
+This runs the full dependency resolver: apt packages -> Go tools -> Ruby gems -> Git clones -> pip packages -> ReconFTW.
 
 ---
 
 ## Usage
 
-### Basic scan
+### Basic full scan
 
 ```bash
-./hackempire example.com --mode pro
-# or: python main.py example.com --mode pro
+python main.py scan example.com --mode full
 ```
 
-### Scan with live web dashboard
+### Scan with live dashboard
 
 ```bash
-./hackempire example.com --mode pro --web
-# Open: http://127.0.0.1:5000/dashboard
+python main.py scan example.com --mode full --web
+# Open: https://127.0.0.1:5443/dashboard
 ```
 
-### Full AI-assisted scan
+### AI-assisted scan
 
 ```bash
-./hackempire example.com --mode lab --ai-key YOUR_OPENROUTER_KEY --web
+python main.py scan example.com --mode full --ai-key YOUR_OPENROUTER_KEY --web
 ```
 
-### Beginner mode (guided, verbose)
+### Stealth scan (Tor + rate limiting)
 
 ```bash
-./hackempire example.com --mode beginner
+python main.py scan example.com --mode stealth --web
 ```
 
-### Multi-target scan from file
+### Exploit mode (requires explicit confirmation)
 
 ```bash
-./hackempire --target-file targets.txt --mode pro --web
+python main.py scan example.com --mode exploit --web
 ```
 
-### Route through Burp Suite proxy
+### Resume an interrupted scan
 
 ```bash
-./hackempire example.com --mode pro --proxy http://127.0.0.1:8080
-```
-
-### Using environment variables (recommended for CI/automation)
-
-```bash
-export OPENROUTER_API_KEY=your_key
-export HACKEMPIRE_MAX_WORKERS=8
-export HACKEMPIRE_TOOL_TIMEOUT_S=120
-./hackempire example.com --mode pro --web
+python main.py scan example.com --mode full --resume
 ```
 
 ---
@@ -241,74 +192,54 @@ export HACKEMPIRE_TOOL_TIMEOUT_S=120
 
 | Command | Description |
 |---|---|
-| `./hackempire <target> --mode pro` | Run a full 3-phase scan |
-| `./hackempire <target> --mode pro --web` | Scan + launch live web dashboard |
-| `./hackempire <target> --mode lab --ai-key KEY` | Scan with AI orchestration |
-| `./hackempire <target> --mode pro --proxy http://127.0.0.1:8080` | Scan through Burp Suite |
-| `./hackempire --target-file targets.txt --mode pro` | Scan multiple targets from file |
-| `./hackempire --status` | Show tool and system installation status |
-| `./hackempire --doctor` | Diagnose and auto-fix broken tools |
-| `./hackempire --clean` | Clear logs and temp files |
-| `./hackempire --uninstall` | Fully remove HackEmpire X |
-
-### Scan Modes
-
-| Mode | Execution | Install Prompts | Best For |
-|---|---|---|---|
-| `beginner` | Sequential | Interactive | Learning, first-time use |
-| `pro` | Parallel | Auto-approve | Real engagements |
-| `lab` | Parallel | Auto-approve | Controlled lab environments |
-
-### Environment Variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `HACKEMPIRE_TOOL_TIMEOUT_S` | `60` | Per-tool subprocess timeout (seconds) |
-| `HACKEMPIRE_MAX_WORKERS` | `4` | Max parallel tool threads |
-| `HACKEMPIRE_WEB_SCHEME` | `http` | URL scheme for web tools (`http`/`https`) |
-| `OPENROUTER_BASE_URL` | OpenRouter default | AI API endpoint override |
-| `OPENROUTER_MODEL` | `meta-llama/llama-3-8b-instruct` | AI model to use |
-| `DIRSEARCH_SCRIPT` | `dirsearch.py` | Path to dirsearch script |
-| `FFUF_WORDLIST` | `wordlist.txt` | Path to ffuf wordlist |
+| `python main.py scan <target> --mode full` | Run 7-phase scan |
+| `python main.py scan <target> --mode recon-only` | Recon phase only |
+| `python main.py scan <target> --mode stealth` | Scan via Tor + rate limiting |
+| `python main.py scan <target> --mode exploit` | Full scan + active exploitation |
+| `python main.py scan <target> --mode full --web` | Scan + live dashboard |
+| `python main.py scan <target> --mode full --resume` | Resume interrupted scan |
+| `python main.py report --format pdf` | Export latest scan as PDF |
+| `python main.py report --format json` | Export as JSON |
+| `python main.py report --format html` | Export as HTML |
+| `python main.py report --format markdown` | Export as Markdown |
+| `python main.py report --format csv` | Export as CSV |
+| `python main.py install-tools` | Install all pentest tools |
+| `python main.py terminal` | Open web terminal in browser |
+| `python main.py config <key> <value>` | Set a config value |
+| `python main.py --status` | Show tool installation status |
+| `python main.py --doctor` | Diagnose and auto-fix broken tools |
+| `python main.py --clean` | Clear logs and temp files |
+| `python main.py --uninstall` | Remove HackEmpire X |
 
 ---
 
 ## Web Dashboard
 
-Launch with `--web` — available at `http://127.0.0.1:5000`
+Available at `https://127.0.0.1:5443` when running with `--web`.
 
 | Route | Description |
 |---|---|
-| `/dashboard` | Live scan overview — stats, tool health, attack tree, high-confidence vulns |
-| `/logs` | Auto-refreshing log viewer (polls every 3 seconds) |
-| `/report` | Full vulnerability report with severity, recommendations, AI decisions |
-| `/api/report/json` | Download full scan report as JSON |
-| `/api/state` | Raw scan state (JSON, for debugging/integration) |
-| `/api/logs` | Latest log lines (JSON, consumed by log viewer) |
+| `/dashboard` | Live scan overview - phase rings, vuln feed, AI decisions, terminal |
+| `/report` | Full vulnerability report with severity and recommendations |
+| `/logs` | Auto-refreshing log viewer |
+| `/api/state` | Raw scan state JSON (for integrations) |
+| `/api/export/json` | Download report as JSON |
+| `/api/export/pdf` | Download report as PDF |
+| `/api/export/html` | Download report as HTML |
+| `/api/export/markdown` | Download report as Markdown |
+| `/api/export/csv` | Download report as CSV |
 
 ---
 
-## Security Model
+## Environment Variables
 
-HackEmpire X is built with security-first principles:
-
-- All subprocess calls use **list arguments** — no shell injection possible
-- Target input is **validated** (domain/IP regex) before any tool runs
-- API keys are **never logged** or written to disk
-- Scan state written to `logs/` which is **gitignored**
-- Web dashboard binds to **127.0.0.1 only** (localhost, not exposed to network)
-- Tool installs require **explicit user confirmation** in beginner mode
-- Config is a **frozen dataclass** — immutable after initialization
-
----
-
-## Performance Tips
-
-- Set `HACKEMPIRE_MAX_WORKERS=8` on machines with 8+ cores
-- Use `--mode pro` for parallel execution (4x faster than beginner)
-- Increase `HACKEMPIRE_TOOL_TIMEOUT_S=120` for slow networks
-- Use `OPENROUTER_MODEL=mistral-7b-instruct` for faster AI responses
-- Run `python main.py --clean` between scans to keep logs lean
+| Variable | Default | Description |
+|---|---|---|
+| `OPENROUTER_API_KEY` | - | AI API key (or pass via --ai-key) |
+| `OPENROUTER_MODEL` | `meta-llama/llama-3-8b-instruct` | LLM model to use |
+| `HACKEMPIRE_TOOL_TIMEOUT_S` | `60` | Per-tool subprocess timeout (seconds) |
+| `HACKEMPIRE_MAX_WORKERS` | `4` | Max parallel tool threads |
+| `HACKEMPIRE_RATE_LIMIT_RPS` | `10` | Requests per second (overridden to 2 in stealth) |
 
 ---
 
@@ -316,68 +247,95 @@ HackEmpire X is built with security-first principles:
 
 ```
 hackempire/
-├── main.py                   # Entry point
-├── requirements.txt
-├── setup.sh                  # Kali Linux setup script
-├── cli/
-│   ├── cli.py                # Main CLI + argument parser
-│   ├── banner.py             # Dynamic Rich banner
-│   └── commands.py           # --status, --doctor, --clean, --uninstall
-├── core/
-│   ├── config.py             # Immutable runtime config (frozen dataclass)
-│   ├── orchestrator.py       # Phase orchestration engine
-│   ├── phases.py             # Phase enum (RECON, ENUM, VULN)
-│   ├── state_manager.py      # Thread-safe in-memory scan state
-│   └── context_manager.py    # AI-ready context builder
-├── ai/
-│   ├── ai_client.py          # OpenRouter HTTP client
-│   ├── prompt_builder.py     # Structured prompt construction
-│   └── response_parser.py    # JSON extraction + schema validation
-├── tools/
-│   ├── base_tool.py          # Abstract base class for all tools
-│   ├── tool_manager.py       # Phase execution engine
-│   ├── health_tracker.py     # Per-tool status tracking
-│   ├── confidence_engine.py  # Confidence scoring + corroboration
-│   ├── deduplicator.py       # URL/port/subdomain deduplication
-│   ├── recon/                # nmap_tool.py, subfinder_tool.py
-│   ├── enum/                 # dirsearch_tool.py, ffuf_tool.py
-│   └── vuln/                 # nuclei_tool.py
-├── installer/
-│   ├── tool_installer.py     # apt/pip/git install engine
-│   ├── dependency_checker.py # Python + package validation
-│   └── tool_doctor.py        # Diagnose + auto-fix tools
-├── web/
-│   ├── app.py                # Flask app factory
-│   ├── routes.py             # Dashboard, logs, report routes
-│   ├── state_bridge.py       # Thread-safe JSON state file
-│   └── templates/
-│       ├── base.html
-│       ├── dashboard.html
-│       ├── logs.html
-│       └── report.html
-├── utils/
-│   ├── logger.py             # Rich console + file logger
-│   └── validator.py          # Target domain/IP validation
-└── logs/
-    ├── hackempire.log         # Runtime log (gitignored)
-    └── scan_state.json        # Live scan state for web GUI (gitignored)
++-- main.py                        # Entry point
++-- requirements.txt
++-- setup.sh
++-- cli/
+|   +-- cli.py                     # Argument parser
+|   +-- commands.py                # All CLI commands
+|   +-- banner.py                  # Rich ASCII banner
+|   +-- progress.py                # Phase progress bars + finding renderer
++-- core/
+|   +-- orchestrator.py            # OrchestratorV2 - 7-phase pipeline
+|   +-- phase_manager.py           # PhaseManager - runs FallbackChain per phase
+|   +-- fallback_chain.py          # FallbackChain - 6 tools + AegisBridge fallback
+|   +-- models.py                  # Vulnerability, ScanContext, ChainResult, etc.
+|   +-- phases.py                  # Phase enum (7 phases)
+|   +-- todo_planner.py            # AI-generated todo list per scan
+|   +-- tor_manager.py             # Tor + proxychains4 stealth routing
+|   +-- config.py                  # Immutable runtime config
+|   +-- state_manager.py           # Thread-safe scan state
++-- ai/
+|   +-- ai_engine.py               # AIEngine v2 - todo, phase analysis, exploits
+|   +-- pentest_kb.py              # PentestKnowledgeBase - OWASP, API Top 10
+|   +-- ai_client.py               # OpenRouter HTTP client
+|   +-- prompt_builder.py          # Structured prompt construction
+|   +-- response_parser.py         # JSON extraction + schema validation
++-- tools/
+|   +-- base_tool.py               # Abstract BaseTool
+|   +-- tool_manager.py            # PHASE_TOOLS_2025 registry (7 phases x 6 tools)
+|   +-- recon/                     # httpx, dnsx, subfinder, nmap, whatweb
+|   +-- url_discovery/             # katana, gauplus
+|   +-- enum/                      # feroxbuster, ffuf, dirsearch, arjun
+|   +-- vuln/                      # nuclei, nikto, dalfox, sqlmap, ghauri
+|   +-- post_exploit/              # linpeas, crackmapexec
+|   +-- methodology/               # XSSMethodology, SQLiMethodology
+|   +-- waf/                       # WafDetector, WafBypassStrategy
+|   +-- external/                  # AegisBridge (last-resort fallback)
++-- installer/
+|   +-- tool_installer.py          # apt/go/gem/git/pip install engine
+|   +-- dependency_resolver.py     # Ordered install pipeline
+|   +-- tool_venv_manager.py       # Per-tool isolated Python venvs
+|   +-- dependency_checker.py      # Pre-flight validation
+|   +-- tool_doctor.py             # Diagnose + auto-fix tools
++-- web/
+|   +-- app.py                     # Flask + SocketIO app factory (TLS :5443)
+|   +-- routes.py                  # Dashboard, report, export routes
+|   +-- realtime_emitter.py        # SocketIO event emitter
+|   +-- terminal_launcher.py       # PTY-backed xterm.js terminal
+|   +-- tls_manager.py             # Self-signed cert generation
+|   +-- state_bridge.py            # Thread-safe JSON state file
+|   +-- pdf_report.py              # WeasyPrint PDF generator
+|   +-- exporters/
+|   |   +-- markdown_export.py
+|   |   +-- csv_export.py
+|   +-- static/
+|   |   +-- hacker-theme.css       # Dark hacker theme
+|   +-- templates/
+|       +-- base.html              # xterm.js v5, socket.io v4, Chart.js v4
+|       +-- dashboard.html         # Live dashboard
+|       +-- report.html            # Vulnerability report
+|       +-- logs.html              # Log viewer
++-- utils/
+|   +-- logger.py                  # Rich console + file logger
+|   +-- validator.py               # Target domain/IP validation
++-- tests/                         # 84 property-based + unit tests
 ```
 
 ---
 
-## Uninstall
+## Security Model
+
+- All subprocess calls use **list arguments** - no shell injection possible
+- Target input **validated** (domain/IP regex) before any tool runs
+- API keys **never logged** or written to disk
+- Web dashboard binds to **127.0.0.1 only**
+- Exploitation-phase tools **gated behind --mode=exploit**
+- Sliver C2 **gated behind explicit consent prompt** at runtime
+- TLS on all web traffic (self-signed cert, port 5443)
+- All tool output **JSON-parsed** before inclusion in AI prompts (prompt injection prevention)
+- Config is a **frozen dataclass** - immutable after initialization
+
+---
+
+## Tests
 
 ```bash
-python main.py --uninstall
+python -m pytest tests/ -q
+# 84 passed
 ```
 
-This will:
-1. Remove the `logs/` directory
-2. Remove all `__pycache__` directories
-3. Optionally uninstall pip packages (`rich`, `requests`, `flask`)
-4. Optionally remove the project directory
-
-System tools (nmap, nuclei, etc.) are never removed automatically.
+Includes property-based tests (Hypothesis) covering: FallbackChain invariants, Vulnerability model bounds, WAF bypass correctness, TorManager immutability, AegisBridge resilience, export MIME types, terminal session uniqueness, and full scan never-raises guarantees.
 
 ---
 
@@ -385,11 +343,10 @@ System tools (nmap, nuclei, etc.) are never removed automatically.
 
 **Chandan Pandey**
 
-> Built with precision for the security community.
-> HackEmpire X is for ethical use only — always hack with permission.
+Built for the security community. Use responsibly - always hack with permission.
 
 ---
 
 ## License
 
-MIT License — free to use, modify, and distribute with attribution.
+MIT License - free to use, modify, and distribute with attribution.
