@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\waf\waf_bypass_strategy.py
-# hypothesis_version: 6.151.9
-
-['--header', '127.0.0.1', 'CF-Connecting-IP', 'True-Client-IP', 'X-Client-IP', 'X-Forwarded-For', 'X-Originating-IP', 'X-Real-IP', 'X-Remote-Addr', 'X-Remote-IP', 'akamai', 'barracuda', 'between', 'charencode', 'cloudflare', 'f5', 'imperva', 'modsecurity', 'randomcase', 'randomcomments', 'space2comment', 'space2randomblank', 'sucuri']

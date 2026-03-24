@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\vuln\sqlmap_tool.py
-# hypothesis_version: 6.151.9
-
-[',', '--batch', '--proxy', '--random-agent', '--tamper', '-m', '-u', 'SQLi', '\\x1b\\[[0-9;]*m', 'critical', 'exploitation', 'injectable', 'is vulnerable', 'name', 'parameter', 'severity', 'sqlmap', 'title', 'vulnerabilities']

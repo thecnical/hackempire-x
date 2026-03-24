@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\installer\tool_doctor.py
-# hypothesis_version: 6.151.9
-
-['FIXED', 'NEEDS MANUAL FIX', 'Reinstall succeeded.', 'already_installed', 'apt', 'beginner', 'details', 'failed', 'fix', 'fix_attempted', 'fix_permissions', 'fix_succeeded', 'fixed', 'git', 'installed', 'issue', 'manual_fix', 'none', 'not_installed', 'ok', 'permission_error', 'pip', 'pro', 'reinstall', 'reports', 'skipped', 'suggestion', 'timeout', 'tool', 'total_issues', 'unknown']

@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\vuln\nikto_tool.py
-# hypothesis_version: 6.151.9
-
-['+', '+ ', '-h', '-nointeractive', '-useproxy', ':', 'OSVDB', '\\x1b\\[[0-9;]*m', 'info', 'nikto', 'severity', 'title', 'vuln_scan', 'vulnerabilities']

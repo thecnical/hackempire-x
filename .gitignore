@@ -41,3 +41,15 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Hypothesis property-based testing cache
+.hypothesis/
+
+# HackEmpire isolated tool venvs
+.hackempire/venvs/
+
+# HackEmpire TLS certs (auto-generated)
+.hackempire/tls/
+
+# HackEmpire config (may contain secrets)
+.hackempire/config.json

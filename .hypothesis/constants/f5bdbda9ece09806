@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\installer\dependency_checker.py
-# hypothesis_version: 6.151.9
-
-['OPENROUTER_BASE_URL', 'OPENROUTER_MODEL', 'flask', 'issues', 'missing_env_vars', 'missing_packages', 'python_ok', 'python_version', 'requests', 'rich']

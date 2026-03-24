@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\enum\feroxbuster_tool.py
-# hypothesis_version: 6.151.9
-
-['(https?://\\S+)', '--no-state', '--proxy', '--silent', '-u', '\\x1b\\[[0-9;]*m', 'enumeration', 'feroxbuster', 'urls']

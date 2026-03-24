@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\enum\ffuf_tool.py
-# hypothesis_version: 6.151.9
-
-['-u', '-w', '-x', '/', 'FFUF_WORDLIST', '\\x1b\\[[0-9;]*m', 'endpoint', 'enum', 'ffuf', 'urls', 'wordlist.txt']

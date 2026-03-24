@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\core\tor_manager.py
-# hypothesis_version: 6.151.9
-
-[b'AUTHENTICATE ""\r\n', b'SIGNAL NEWNYM\r\n', 1024, 9050, 9051, '-q', '127.0.0.1', 'IsTor', 'http', 'https', 'proxychains4', 'service', 'start', 'stop', 'tor']

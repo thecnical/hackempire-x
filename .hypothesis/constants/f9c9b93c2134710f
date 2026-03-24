@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\web\realtime_emitter.py
-# hypothesis_version: 6.151.9
-
-['%Y-%m-%dT%H:%M:%S.%f', 'Z', 'data', 'error', 'event', 'phase', 'phase_complete', 'report', 'result', 'scan_complete', 'target', 'terminal_output', 'timestamp', 'todo', 'todo_update', 'tool', 'tool_error', 'tool_result', 'tool_start', 'vuln', 'vuln_found']

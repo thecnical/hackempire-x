@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\enum\dirsearch_tool.py
-# hypothesis_version: 6.151.9
-
-[120, '--plain-text-report', '-u', '/', '/dev/stdout', 'DIRSEARCH_SCRIPT', '\\x1b\\[[0-9;]*m', 'dirsearch', 'dirsearch.py', 'enum', 'path', 'python', 'python3', 'urls']

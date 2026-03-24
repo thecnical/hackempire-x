@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\core\context_manager.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.8, 'confidence', 'current_phase', 'data', 'enum', 'mode', 'multi_source_vulns', 'open_ports_count', 'ports', 'recon', 'sources', 'subdomains', 'subdomains_count', 'summary', 'target', 'tool_health', 'urls', 'urls_count', 'vuln', 'vulnerabilities']

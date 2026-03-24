@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\web\tls_manager.py
-# hypothesis_version: 6.151.9
-
-['-days', '-keyout', '-newkey', '-nodes', '-out', '-subj', '-x509', '.hackempire/tls', '/CN=hackempire', '365', 'cert.pem', 'key.pem', 'openssl', 'replace', 'req', 'rsa:4096']

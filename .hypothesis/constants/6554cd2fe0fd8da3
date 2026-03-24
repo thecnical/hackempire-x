@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\external\aegis_bridge.py
-# hypothesis_version: 6.151.9
-
-[120, '--json', '--phase', '--target', 'aegis', 'aegis not available', 'clone', 'empty output', 'error', 'evidence', 'failed', 'git', 'info', 'name', 'not_installed', 'replace', 'severity', 'subdomain', 'subdomains', 'success', 'tool_sources', 'tools/external/aegis', 'type', 'unknown', 'url', 'urls', 'value', 'vulnerabilities', 'vulnerability']

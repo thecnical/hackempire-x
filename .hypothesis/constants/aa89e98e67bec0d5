@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\tool_manager.py
-# hypothesis_version: 6.151.9
-
-[0.0, 'afrog', 'ai-summary', 'amass', 'arjun', 'bloodhound', 'caido', 'cariddi', 'commix', 'confidence', 'crackmapexec', 'csv-export', 'cve_findings', 'dalfox', 'dirsearch', 'dnsx', 'enumeration', 'exploitation', 'failed', 'feroxbuster', 'ffuf', 'gau', 'ghauri', 'github-subdomains', 'gospider', 'hakrawler', 'html-report', 'httpx', 'impacket', 'jsluice', 'json-export', 'katana', 'kiterunner', 'linpeas', 'markdown-export', 'metasploit-rpc', 'name', 'nikto', 'not_installed', 'nuclei', 'ok', 'parallel', 'paramspider', 'pdf-generator', 'ports', 'post_exploit', 'proxy', 'recon', 'reporting', 'shuffledns', 'skipped', 'sqlmap', 'subdomains', 'subfinder', 'target', 'testssl', 'timeout', 'timeout_s', 'title', 'tool_status', 'trufflehog', 'unknown', 'url_discovery', 'urls', 'venv_packages', 'venv_python', 'vuln_scan', 'vulnerabilities', 'waybackurls', 'web_scheme', 'xsstrike']

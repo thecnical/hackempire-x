@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\ai\prompt_builder.py
-# hypothesis_version: 6.151.9
-
-['None', 'ai_decision', 'ai_history', 'current_phase', 'data', 'enum', 'mode', 'recon', 'summary', 'target', 'tool_health', 'vuln']

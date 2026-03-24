@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\recon\subfinder_tool.py
-# hypothesis_version: 6.151.9
-
-['-d', '-silent', '[', '\\x1b\\[[0-9;]*m', 'output', 'recon', 'subdomains', 'subfinder', 'using']

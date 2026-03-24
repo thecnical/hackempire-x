@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\utils\logger.py
-# hypothesis_version: 6.151.9
-
-['%Y-%m-%d %H:%M:%S', 'ERROR', 'INFO', 'SUCCESS', 'WARNING', 'baseFilename', 'bold cyan', 'bold green', 'bold red', 'bold yellow', 'hackempire', 'hackempire.log', 'logs', 'utf-8']

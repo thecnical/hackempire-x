@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\recon\httpx_tool.py
-# hypothesis_version: 6.151.9
-
-['(https?://\\S+)', '-http-proxy', '-silent', '-status-code', '-title', '-u', '\\x1b\\[[0-9;]*m', 'httpx', 'recon', 'urls']

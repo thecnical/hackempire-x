@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\installer\tool_venv_manager.py
-# hypothesis_version: 6.151.9
-
-['--quiet', '-m', '.hackempire/venvs', 'Scripts', 'ToolVenvManager', 'arjun', 'bin', 'bloodhound', 'crackmapexec', 'fuzzywuzzy', 'ghauri', 'impacket', 'install', 'paramspider', 'pip', 'python', 'python.exe', 'requests', 'sqlmap', 'venv', 'win32', 'xsstrike']

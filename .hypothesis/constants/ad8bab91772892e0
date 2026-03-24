@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\web\routes.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.55, 0.7, 0.85, 10.0, 100, 200, 400, '/', '/api/export/<fmt>', '/api/logs', '/api/report/json', '/api/report/pdf', '/api/state', '/dashboard', '/logs', '/report', 'Enum', 'Recon', 'Target', 'Vuln', 'ai_decision', 'ai_decisions', 'application/json', 'application/pdf', 'children', 'confidence', 'critical', 'csv', 'current_phase', 'cve_findings', 'cvss_score', 'dashboard.html', 'data', 'enum', 'error', 'exec', 'findings', 'hackempire.log', 'high', 'html', 'json', 'label', 'lfi', 'lines', 'logs', 'logs.html', 'low', 'main', 'markdown', 'medium', 'mode', 'name', 'path', 'pdf', 'ports', 'rce', 'recommendation', 'recon', 'replace', 'report.html', 'severity', 'severity_label', 'sql', 'subdomains', 'target', 'technologies', 'text/csv', 'text/html', 'text/markdown', 'title', 'tool_health', 'urls', 'utf-8', 'vuln', 'vulnerabilities', 'xss', '—']

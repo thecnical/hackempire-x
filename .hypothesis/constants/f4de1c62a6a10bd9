@@ -1,4 +1,0 @@
-# file: D:\webof _up_nz\HackEmpire X\hackempire\tools\vuln\ghauri_tool.py
-# hypothesis_version: 6.151.9
-
-['--batch', '--proxy', '-m', '-u', 'SQLi', '\\x1b\\[[0-9;]*m', 'ghauri', 'high', 'injectable', 'name', 'parameter', 'severity', 'title', 'vuln_scan', 'vulnerabilities']
