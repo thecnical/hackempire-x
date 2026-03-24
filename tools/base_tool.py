@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 import os
 import subprocess
+from pathlib import Path
 from typing import Any, Optional
 
 
@@ -26,16 +27,30 @@ class BaseTool(abc.ABC):
       - check_installed
       - build_command
       - parse_output
+
+    Venv enforcement:
+      If a subclass declares `venv_packages: list[str]`, BaseTool will
+      automatically ensure the tool's isolated venv exists before running.
+      The resolved venv Python path is stored in self._venv_python so that
+      build_command() can use it instead of the system binary.
     """
 
     name: str
     phase: str
+    # Subclasses declare this to opt into automatic venv isolation
+    venv_packages: list[str] = []
 
-    def __init__(self, *, timeout_s: float, proxy: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        *,
+        timeout_s: float,
+        proxy: Optional[str] = None,
+        venv_python: Optional[Path] = None,
+    ) -> None:
         self._timeout_s = timeout_s
-        # Proxy URL (e.g. "http://127.0.0.1:8080") — injected by ToolManager.
-        # Tools that support proxy flags should read self._proxy in build_command().
         self._proxy: Optional[str] = proxy or os.environ.get("HACKEMPIRE_PROXY")
+        # Injected by ToolManager when venv already exists, or resolved lazily below
+        self._venv_python: Optional[Path] = venv_python
 
     @abc.abstractmethod
     def check_installed(self) -> bool:
@@ -47,7 +62,6 @@ class BaseTool(abc.ABC):
 
         Production note: automatic installs can be unsafe; prefer explicit user provisioning.
         """
-
         raise NotImplementedError("Automatic installation is not supported in this Phase.")
 
     @abc.abstractmethod
@@ -57,6 +71,38 @@ class BaseTool(abc.ABC):
     @abc.abstractmethod
     def parse_output(self, raw_output: str) -> dict[str, Any]:
         raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Venv enforcement
+    # ------------------------------------------------------------------
+
+    def _ensure_venv(self) -> None:
+        """
+        If this tool declares venv_packages and no venv_python has been
+        injected yet, auto-create the isolated venv now.
+
+        This is the safety net — ToolManager injects venv_python proactively,
+        but if a tool is instantiated directly (e.g. from a methodology class
+        or the AI engine), this ensures it still runs in isolation.
+        """
+        if self._venv_python is not None:
+            return  # already resolved
+        if not self.venv_packages:
+            return  # not a pip-based tool
+
+        try:
+            from installer.tool_venv_manager import get_global_venv_manager
+            manager = get_global_venv_manager()
+            resolved = manager.ensure_venv(self.name, self.venv_packages)
+            if resolved:
+                self._venv_python = resolved
+        except Exception:
+            # Non-fatal — fall back to system binary
+            pass
+
+    # ------------------------------------------------------------------
+    # Proxy env helper
+    # ------------------------------------------------------------------
 
     def _build_proxy_env(self) -> dict[str, str] | None:
         """
@@ -73,7 +119,14 @@ class BaseTool(abc.ABC):
         env["HTTPS_PROXY"] = self._proxy
         return env
 
+    # ------------------------------------------------------------------
+    # Run
+    # ------------------------------------------------------------------
+
     def run(self, target: str) -> dict[str, Any]:
+        # Enforce venv isolation before anything else
+        self._ensure_venv()
+
         if not self.check_installed():
             raise ToolNotInstalledError(f"Tool '{self.name}' is not installed or not available.")
 

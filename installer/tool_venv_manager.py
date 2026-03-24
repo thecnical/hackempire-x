@@ -18,6 +18,34 @@ from utils.logger import Logger
 
 
 # ---------------------------------------------------------------------------
+# Global singleton — used by BaseTool._ensure_venv() for auto-isolation
+# ---------------------------------------------------------------------------
+
+_GLOBAL_VENV_MANAGER: "ToolVenvManager | None" = None
+
+
+def get_global_venv_manager() -> "ToolVenvManager":
+    """
+    Return the process-wide ToolVenvManager singleton.
+
+    Created on first call with a no-op logger. The real logger is injected
+    when ToolManager or DependencyResolver initialises their own instance
+    via set_global_venv_manager().
+    """
+    global _GLOBAL_VENV_MANAGER
+    if _GLOBAL_VENV_MANAGER is None:
+        from utils.logger import Logger as _Logger
+        _GLOBAL_VENV_MANAGER = ToolVenvManager(logger=_Logger())
+    return _GLOBAL_VENV_MANAGER
+
+
+def set_global_venv_manager(manager: "ToolVenvManager") -> None:
+    """Register *manager* as the process-wide singleton."""
+    global _GLOBAL_VENV_MANAGER
+    _GLOBAL_VENV_MANAGER = manager
+
+
+# ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 

