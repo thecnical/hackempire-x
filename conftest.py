@@ -1,12 +1,13 @@
 """
 conftest.py — pytest path + package alias setup for HackEmpire X.
 
-The repo root IS the hackempire package (main.py, core/, tools/, etc. live here).
-Tests import via `from hackempire.core.xxx import ...` — so we register this
-directory as the `hackempire` package in sys.modules at collection time.
+The repo root IS the hackempire/ package directory. This means:
+  - Locally: parent dir contains hackempire/ folder → `import hackempire` works
+  - CI (GitHub Actions): repo cloned as hackempire-x/, no hackempire/ subfolder
 
-This works regardless of what the cloned folder is named (hackempire-x on GitHub,
-hackempire locally, etc.).
+This conftest handles both cases by injecting a `hackempire` module alias
+that points to the current package root, so `from hackempire.core.xxx import ...`
+works in all environments.
 """
 from __future__ import annotations
 
@@ -14,33 +15,37 @@ import sys
 import types
 from pathlib import Path
 
-# This file lives at the repo root (same level as main.py, core/, tools/, etc.)
-_REPO_ROOT = Path(__file__).resolve().parent
+# This file lives at the repo root (same dir as main.py, core/, tools/, etc.)
+_PKG_ROOT = Path(__file__).resolve().parent
 
-# Ensure the repo root is on sys.path so bare imports work:
-#   from core.xxx import ...   (used inside source files)
+# Add repo root to sys.path so direct imports work: `from core.xxx import ...`
+if str(_PKG_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PKG_ROOT))
+
+# Also add parent in case it contains a hackempire/ subfolder (local dev)
+_REPO_ROOT = _PKG_ROOT.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-# Also ensure the PARENT is on sys.path (belt-and-suspenders for any edge cases)
-_PARENT = _REPO_ROOT.parent
-if str(_PARENT) not in sys.path:
-    sys.path.insert(0, str(_PARENT))
-
-# Register this directory as the `hackempire` package so that:
-#   from hackempire.core.xxx import ...   works in tests
-# regardless of what the cloned folder is named on disk.
+# If `hackempire` is not already importable as a package (CI case),
+# inject a module alias so `from hackempire.core.xxx import ...` resolves
+# to `from core.xxx import ...` transparently.
 if "hackempire" not in sys.modules:
-    import importlib.util as _ilu
+    import importlib
+    import importlib.util
 
-    # Create a package spec pointing at this directory
-    _spec = _ilu.spec_from_file_location(
+    # Create a package stub for `hackempire` pointing to _PKG_ROOT
+    spec = importlib.util.spec_from_file_location(
         "hackempire",
-        str(_REPO_ROOT / "__init__.py"),
-        submodule_search_locations=[str(_REPO_ROOT)],
+        str(_PKG_ROOT / "__init__.py"),
+        submodule_search_locations=[str(_PKG_ROOT)],
     )
-    _pkg = _ilu.module_from_spec(_spec)
-    _pkg.__path__ = [str(_REPO_ROOT)]  # type: ignore[attr-defined]
-    _pkg.__package__ = "hackempire"
-    sys.modules["hackempire"] = _pkg
-    _spec.loader.exec_module(_pkg)  # type: ignore[union-attr]
+    if spec is not None:
+        mod = importlib.util.module_from_spec(spec)
+        mod.__path__ = [str(_PKG_ROOT)]  # type: ignore[attr-defined]
+        mod.__package__ = "hackempire"
+        sys.modules["hackempire"] = mod
+        try:
+            spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        except Exception:
+            pass  # __init__.py is empty, that's fine
