@@ -1,24 +1,46 @@
 """
-conftest.py — pytest path setup for HackEmpire X.
+conftest.py — pytest path + package alias setup for HackEmpire X.
 
-Ensures both the repo root (parent of hackempire/) and hackempire/ itself
-are on sys.path so that:
-  - `from hackempire.core.xxx import ...`  works (package-style imports in tests)
-  - `from core.xxx import ...`             works (direct imports in source files)
+The repo root IS the hackempire package (main.py, core/, tools/, etc. live here).
+Tests import via `from hackempire.core.xxx import ...` — so we register this
+directory as the `hackempire` package in sys.modules at collection time.
 
-This file is picked up automatically by pytest before any test collection.
+This works regardless of what the cloned folder is named (hackempire-x on GitHub,
+hackempire locally, etc.).
 """
 from __future__ import annotations
 
 import sys
+import types
 from pathlib import Path
 
-# hackempire/ directory (where main.py lives)
-_PKG_ROOT = Path(__file__).resolve().parent
+# This file lives at the repo root (same level as main.py, core/, tools/, etc.)
+_REPO_ROOT = Path(__file__).resolve().parent
 
-# repo root (parent of hackempire/) — this is what makes `import hackempire` work
-_REPO_ROOT = _PKG_ROOT.parent
+# Ensure the repo root is on sys.path so bare imports work:
+#   from core.xxx import ...   (used inside source files)
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-for _p in (_PKG_ROOT, _REPO_ROOT):
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
+# Also ensure the PARENT is on sys.path (belt-and-suspenders for any edge cases)
+_PARENT = _REPO_ROOT.parent
+if str(_PARENT) not in sys.path:
+    sys.path.insert(0, str(_PARENT))
+
+# Register this directory as the `hackempire` package so that:
+#   from hackempire.core.xxx import ...   works in tests
+# regardless of what the cloned folder is named on disk.
+if "hackempire" not in sys.modules:
+    import importlib.util as _ilu
+
+    # Create a package spec pointing at this directory
+    _spec = _ilu.spec_from_file_location(
+        "hackempire",
+        str(_REPO_ROOT / "__init__.py"),
+        submodule_search_locations=[str(_REPO_ROOT)],
+    )
+    _pkg = _ilu.module_from_spec(_spec)
+    _pkg.__path__ = [str(_REPO_ROOT)]  # type: ignore[attr-defined]
+    _pkg.__package__ = "hackempire"
+    sys.modules["hackempire"] = _pkg
+    _spec.loader.exec_module(_pkg)  # type: ignore[union-attr]
