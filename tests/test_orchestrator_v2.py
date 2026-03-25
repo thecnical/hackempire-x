@@ -8,6 +8,7 @@ Property 1: Full Scan Never Raises
 
 import sys
 import os
+from unittest.mock import patch
 
 _here = os.path.dirname(os.path.abspath(__file__))
 _pkg_root = os.path.dirname(_here)
@@ -59,7 +60,7 @@ _modes = st.sampled_from(["full", "recon-only", "stealth", "exploit"])
 
 
 @given(target=_valid_targets, mode=_modes)
-@settings(max_examples=30, deadline=5000)
+@settings(max_examples=30, deadline=None)
 def test_full_scan_never_raises(target: str, mode: str) -> None:
     """
     Property 1: Full Scan Never Raises
@@ -67,14 +68,24 @@ def test_full_scan_never_raises(target: str, mode: str) -> None:
     For any valid target string and any mode, run_full_scan(target) SHALL
     return a dict without raising an exception.
 
+    Tor is mocked so stealth mode does not attempt systemctl/service calls
+    in CI environments where interactive auth is unavailable.
+
     **Validates: Requirements 1.2, 1.4**
     """
     config = _Config(mode=mode)
     logger = _Logger()
-    orch = OrchestratorV2(config=config, logger=logger)
 
-    # No PhaseManager injected — phases are skipped, but the method must not raise
-    result = orch.run_full_scan(target)
+    # Mock TorManager.start so stealth mode doesn't block waiting 30s for Tor
+    # and doesn't attempt `service tor start` (requires root/interactive auth in CI)
+    with patch("hackempire.core.tor_manager.TorManager.start", return_value=False), \
+         patch("hackempire.core.tor_manager.TorManager.stop", return_value=None), \
+         patch("hackempire.core.tor_manager.subprocess.run", return_value=None):
+
+        orch = OrchestratorV2(config=config, logger=logger)
+
+        # No PhaseManager injected — phases are skipped, but the method must not raise
+        result = orch.run_full_scan(target)
 
     assert isinstance(result, dict), "run_full_scan must return a dict"
     assert "target" in result, "result must contain 'target'"
