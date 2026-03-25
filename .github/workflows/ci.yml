@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install system dependencies (weasyprint, wafw00f)
+      - name: Install system dependencies (weasyprint)
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
@@ -34,9 +34,7 @@ jobs:
             libxml2-dev libxslt1-dev
 
       - name: Install Python dependencies
-        working-directory: hackempire
         run: pip install -r requirements.txt
 
       - name: Run tests
-        working-directory: hackempire
         run: python -m pytest tests/ -q --tb=short
