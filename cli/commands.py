@@ -426,26 +426,23 @@ def _run_v2_scan(
         logger.warning(f"[v2] PhaseManager unavailable: {exc}")
 
     ai_engine = None
-    if ai_key:
-        try:
-            from ai.ai_engine import AIEngine
-            # Load saved keys from config
-            config_file = _ROOT / ".hackempire" / "config.json"
-            saved = {}
-            if config_file.exists():
-                import json as _json
-                try:
-                    saved = _json.loads(config_file.read_text())
-                except Exception:
-                    pass
-            bytez_key = saved.get("bytez_key", "")
-            openrouter_key = saved.get("openrouter_key", "") or ai_key
+    try:
+        from ai.ai_engine import AIEngine
+        # Always load saved keys from ~/.hackempire/config.json
+        saved = _load_config()
+        bytez_key = saved.get("bytez_key", "")
+        openrouter_key = saved.get("openrouter_key", "") or ai_key or ""
+        if bytez_key or openrouter_key:
             ai_engine = AIEngine(
                 bytez_key=bytez_key,
                 openrouter_key=openrouter_key,
             )
-        except Exception as exc:
-            logger.warning(f"[v2] AIEngine unavailable: {exc}")
+            provider = "Bytez AI" if bytez_key else "OpenRouter"
+            logger.info(f"[v2] AIEngine ready — primary provider: {provider}")
+        else:
+            logger.info("[v2] No AI keys configured — using offline KB. Run: ./hackempire config bytez_key YOUR_KEY")
+    except Exception as exc:
+        logger.warning(f"[v2] AIEngine unavailable: {exc}")
 
     todo_planner = None
     try:
@@ -668,38 +665,85 @@ def cmd_terminal(console: Console) -> int:
 
 
 # ---------------------------------------------------------------------------
-# config
+# Config helpers — used by multiple commands
 # ---------------------------------------------------------------------------
 
-_CONFIG_DIR = _ROOT / ".hackempire"
+# Config lives in the user's home directory, NOT inside the repo
+_CONFIG_DIR = Path.home() / ".hackempire"
 _CONFIG_FILE = _CONFIG_DIR / "config.json"
 
 
-def cmd_config(console: Console, key: str, value: str) -> int:
-    """Write a key/value pair to .hackempire/config.json."""
+def _load_config() -> dict:
+    """Load config from ~/.hackempire/config.json. Creates it if missing."""
     _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    if not _CONFIG_FILE.exists():
+        _CONFIG_FILE.write_text(json.dumps({}, indent=2), encoding="utf-8")
+    try:
+        return json.loads(_CONFIG_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
 
-    config: dict = {}
-    if _CONFIG_FILE.exists():
-        try:
-            config = json.loads(_CONFIG_FILE.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            config = {}
 
+def _save_config(data: dict) -> None:
+    """Save config dict to ~/.hackempire/config.json."""
+    _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    _CONFIG_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def cmd_config(console: Console, key: str, value: str) -> int:
+    """Write a key/value pair to ~/.hackempire/config.json."""
+    config = _load_config()
     config[key] = value
-    _CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding="utf-8")
+    _save_config(config)
 
-    # Friendly messages for known keys
     hints = {
-        "bytez_key":       "Bytez AI key saved. Get yours at https://bytez.com",
-        "openrouter_key":  "OpenRouter key saved. Get yours at https://openrouter.ai",
+        "bytez_key":      "Bytez AI key saved. Get yours at https://bytez.com",
+        "openrouter_key": "OpenRouter key saved. Get yours at https://openrouter.ai",
+        "proxy":          "Proxy saved. Traffic will route through this address.",
     }
     hint = hints.get(key, "")
+    masked = value[:8] + "*" * max(0, len(value) - 8) if len(value) > 4 else "****"
 
-    console.print(
-        f"[bold green]Config updated:[/bold green] "
-        f"[cyan]{key}[/cyan] = [white]{value[:8]}{'*' * max(0, len(value)-8)}[/white]"
-    )
-    if hint:
-        console.print(f"[dim]  {hint}[/dim]")
+    console.print(Panel(
+        f"[bold green]Config saved[/bold green]\n\n"
+        f"  Key   : [cyan]{key}[/cyan]\n"
+        f"  Value : [white]{masked}[/white]\n"
+        f"  File  : [dim]{_CONFIG_FILE}[/dim]\n"
+        + (f"\n  [dim]{hint}[/dim]" if hint else ""),
+        border_style="green",
+        title="[bold]~/.hackempire/config.json[/bold]",
+    ))
+    return 0
+
+
+def cmd_config_show(console: Console) -> int:
+    """Show current config from ~/.hackempire/config.json."""
+    config = _load_config()
+
+    console.print(Panel(
+        f"[bold cyan]Config file:[/bold cyan] [dim]{_CONFIG_FILE}[/dim]",
+        border_style="cyan",
+    ))
+
+    if not config:
+        console.print("[dim]  No config set yet. Use: ./hackempire config <key> <value>[/dim]\n")
+        console.print("  [bold]Available keys:[/bold]")
+        console.print("    [cyan]bytez_key[/cyan]       — Bytez AI API key (primary AI provider)")
+        console.print("    [cyan]openrouter_key[/cyan]  — OpenRouter API key (fallback AI provider)")
+        console.print("    [cyan]proxy[/cyan]           — HTTP proxy URL (e.g. http://127.0.0.1:8080)")
+        return 0
+
+    table = Table(border_style="cyan", show_lines=True)
+    table.add_column("Key", style="bold cyan")
+    table.add_column("Value", style="white")
+
+    for k, v in config.items():
+        # Mask sensitive keys
+        if "key" in k.lower() or "token" in k.lower() or "secret" in k.lower():
+            display = str(v)[:8] + "*" * max(0, len(str(v)) - 8)
+        else:
+            display = str(v)
+        table.add_row(k, display)
+
+    console.print(table)
     return 0

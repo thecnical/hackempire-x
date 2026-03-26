@@ -136,35 +136,56 @@ The setup script automatically installs everything — apt packages, Go tools, g
 
 ## Configuration
 
-HackEmpire X stores all configuration in a single JSON file:
+HackEmpire X stores all configuration in:
 
-```
-~/.hackempire/config.json   ← created automatically on first use
-```
-
-You can view and edit it directly, or use the `config` command:
-
-```bash
-# Set your Bytez AI key (primary AI provider)
-./hackempire config bytez_key YOUR_BYTEZ_KEY
-
-# Set your OpenRouter key (fallback AI provider)
-./hackempire config openrouter_key YOUR_OPENROUTER_KEY
-
-# Set a custom proxy (e.g. Burp Suite)
-./hackempire config proxy http://127.0.0.1:8080
-```
-
-**Where to get API keys:**
-- Bytez AI: [https://bytez.com](https://bytez.com) — sign up and get your key from the dashboard
-- OpenRouter: [https://openrouter.ai](https://openrouter.ai) — free tier available
-
-**Config file location:**
 ```
 ~/.hackempire/config.json
 ```
 
-Example config file:
+This file is **created automatically** — you never need to create it manually.
+
+### Step 1 — Set your AI keys
+
+```bash
+# Bytez AI — primary provider (https://bytez.com)
+./hackempire config bytez_key YOUR_BYTEZ_KEY
+
+# OpenRouter — fallback provider (https://openrouter.ai)
+./hackempire config openrouter_key YOUR_OPENROUTER_KEY
+```
+
+### Step 2 — View your current config
+
+```bash
+./hackempire config show
+```
+
+### Other options
+
+```bash
+# Route all tool traffic through Burp Suite
+./hackempire config proxy http://127.0.0.1:8080
+```
+
+### Config file location
+
+Always at:
+```
+/home/YOUR_USERNAME/.hackempire/config.json
+```
+
+Example on Kali with user `abhay`:
+```
+/home/abhay/.hackempire/config.json
+```
+
+View or edit directly:
+```bash
+cat ~/.hackempire/config.json
+nano ~/.hackempire/config.json
+```
+
+Example contents:
 ```json
 {
   "bytez_key": "bz-xxxxxxxxxxxxxxxxxxxx",
@@ -173,7 +194,14 @@ Example config file:
 }
 ```
 
-AI provider priority: **Bytez → OpenRouter → Offline KB**. If Bytez fails, OpenRouter is used automatically. If both fail, the built-in knowledge base handles everything offline — no API key required to run scans.
+### Where to get API keys
+
+| Provider | URL | Notes |
+|----------|-----|-------|
+| Bytez AI | [bytez.com](https://bytez.com) | Primary — sign up and copy key from dashboard |
+| OpenRouter | [openrouter.ai](https://openrouter.ai) | Fallback — free tier available |
+
+**AI provider priority:** Bytez → OpenRouter → Offline KB. No API key required — the built-in knowledge base works fully offline.
 
 ---
 
@@ -225,6 +253,7 @@ AI provider priority: **Bytez → OpenRouter → Offline KB**. If Bytez fails, O
 | `report --format pdf\|json\|html\|markdown\|csv` | Export latest report |
 | `install-tools` | Install all 40+ pentest tools |
 | `config <key> <value>` | Set a config value (bytez_key, openrouter_key, proxy) |
+| `config show` | Show current config from ~/.hackempire/config.json |
 | `--status` | Show tool health status |
 | `--doctor` | Diagnose and auto-fix broken tools |
 | `--clean` | Clear logs and temp files |
