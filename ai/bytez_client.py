@@ -1,10 +1,8 @@
 """
-AIClient — OpenRouter HTTP client for HackEmpire X (fallback provider).
+BytezClient — Bytez AI (https://bytez.com) HTTP client for HackEmpire X.
 
-Primary provider: Bytez AI (bytez_client.py)
-Fallback provider: OpenRouter (this file)
-
-API: https://openrouter.ai/docs
+Bytez is the primary AI provider. OpenRouter is the fallback.
+API docs: https://bytez.com/docs/api
 """
 from __future__ import annotations
 
@@ -13,31 +11,34 @@ from typing import Any, Optional
 
 import requests
 
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_DEFAULT_MODEL = "meta-llama/llama-3-8b-instruct:free"
+BYTEZ_BASE_URL = "https://api.bytez.com/models/v2"
+BYTEZ_DEFAULT_MODEL = "meta-llama/Llama-3.2-3B-Instruct"
 
 
-class AIClient:
+class BytezClient:
     """
-    OpenRouter-compatible client — fallback AI provider for HackEmpire X.
+    Bytez AI API client — primary AI provider for HackEmpire X.
+
+    Usage:
+        client = BytezClient(api_key="your-bytez-key")
+        response = client.send_request("Your prompt here")
+        # response = {"raw_text": "...", "status_code": 200}
     """
 
     def __init__(
         self,
         *,
         api_key: str,
-        base_url: str = OPENROUTER_BASE_URL,
-        model: str = OPENROUTER_DEFAULT_MODEL,
-        timeout_s: float = 25.0,
+        model: str = BYTEZ_DEFAULT_MODEL,
+        timeout_s: float = 30.0,
     ) -> None:
         self._api_key = api_key
-        self._base_url = base_url
         self._model = model
         self._timeout_s = timeout_s
 
     def send_request(self, prompt: str) -> dict[str, Any]:
         """
-        Send a chat completion request to OpenRouter.
+        Send a chat completion request to Bytez API.
         Returns {"raw_text": str, "status_code": int}.
         Never raises.
         """
@@ -46,12 +47,12 @@ class AIClient:
 
         headers = {
             "Authorization": f"Bearer {self._api_key}",
-            "HTTP-Referer": "https://github.com/thecnical/hackempire-x",
-            "X-Title": "HackEmpire X",
+            "Content-Type": "application/json",
         }
         payload = {
             "model": self._model,
             "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
         }
 
         last_error: Optional[BaseException] = None
@@ -60,11 +61,12 @@ class AIClient:
         for attempt in range(1, 4):
             try:
                 resp = requests.post(
-                    self._base_url,
+                    f"{BYTEZ_BASE_URL}/chat/completions",
                     headers=headers,
                     json=payload,
                     timeout=self._timeout_s,
                 )
+                # Extract text from Bytez response format
                 raw_text = ""
                 if resp.status_code == 200:
                     try:
@@ -93,3 +95,17 @@ class AIClient:
             "status_code": 0,
             "error": str(last_error) if last_error else "unknown",
         }
+
+    def is_available(self) -> bool:
+        """Quick health check — returns True if Bytez API is reachable."""
+        if not self._api_key:
+            return False
+        try:
+            resp = requests.get(
+                f"{BYTEZ_BASE_URL}/models",
+                headers={"Authorization": f"Bearer {self._api_key}"},
+                timeout=5.0,
+            )
+            return resp.status_code == 200
+        except Exception:
+            return False

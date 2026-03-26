@@ -40,7 +40,7 @@ def cmd_status(console: Console) -> int:
     table.add_column("Install Method", style="dim")
 
     for name, spec in TOOL_INSTALL_SPECS.items():
-        binary = spec.post_install_bin or spec.name
+        binary = spec.check_bin if spec.check_bin else spec.name
         found = shutil.which(binary) is not None
         status = Text("INSTALLED", style="bold green") if found else Text("MISSING", style="bold red")
         table.add_row(name, binary, status, spec.method)
@@ -429,7 +429,21 @@ def _run_v2_scan(
     if ai_key:
         try:
             from ai.ai_engine import AIEngine
-            ai_engine = AIEngine(api_key=ai_key)
+            # Load saved keys from config
+            config_file = _ROOT / ".hackempire" / "config.json"
+            saved = {}
+            if config_file.exists():
+                import json as _json
+                try:
+                    saved = _json.loads(config_file.read_text())
+                except Exception:
+                    pass
+            bytez_key = saved.get("bytez_key", "")
+            openrouter_key = saved.get("openrouter_key", "") or ai_key
+            ai_engine = AIEngine(
+                bytez_key=bytez_key,
+                openrouter_key=openrouter_key,
+            )
         except Exception as exc:
             logger.warning(f"[v2] AIEngine unavailable: {exc}")
 
@@ -674,8 +688,18 @@ def cmd_config(console: Console, key: str, value: str) -> int:
 
     config[key] = value
     _CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+    # Friendly messages for known keys
+    hints = {
+        "bytez_key":       "Bytez AI key saved. Get yours at https://bytez.com",
+        "openrouter_key":  "OpenRouter key saved. Get yours at https://openrouter.ai",
+    }
+    hint = hints.get(key, "")
+
     console.print(
         f"[bold green]Config updated:[/bold green] "
-        f"[cyan]{key}[/cyan] = [white]{value}[/white]"
+        f"[cyan]{key}[/cyan] = [white]{value[:8]}{'*' * max(0, len(value)-8)}[/white]"
     )
+    if hint:
+        console.print(f"[dim]  {hint}[/dim]")
     return 0

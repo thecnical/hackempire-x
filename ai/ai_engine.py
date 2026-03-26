@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from hackempire.ai.ai_client import AIClient
+from hackempire.ai.bytez_client import BytezClient
 from hackempire.ai.pentest_kb import PHASE_ORDER, PentestKnowledgeBase
 from hackempire.core.models import AIDecision, TodoList, TodoTask, Vulnerability
 
@@ -155,19 +156,57 @@ class AIEngine(AIClient):
     """
     AI-powered pentesting intelligence engine.
 
-    Extends AIClient with high-level pentesting methods.
-    Falls back to PentestKnowledgeBase when the AI API is unavailable.
+    Provider priority:
+      1. Bytez AI (primary) — https://bytez.com
+      2. OpenRouter (fallback) — https://openrouter.ai
+      3. PentestKnowledgeBase (offline fallback)
+
+    Pass bytez_key and/or openrouter_key. If both are set, Bytez is tried first.
+    If Bytez fails or is not configured, OpenRouter is tried.
+    If both fail, the offline KB is used.
     """
 
     def __init__(
         self,
-        api_key: str,
-        base_url: str,
-        model: str = "meta-llama/llama-3-8b-instruct",
+        api_key: str = "",
+        base_url: str = "https://openrouter.ai/api/v1/chat/completions",
+        model: str = "meta-llama/llama-3-8b-instruct:free",
         knowledge_base: PentestKnowledgeBase | None = None,
+        bytez_key: str = "",
+        openrouter_key: str = "",
     ) -> None:
-        super().__init__(api_key=api_key, base_url=base_url, model=model)
+        # Support both old-style api_key and new explicit keys
+        _openrouter_key = openrouter_key or api_key
+        super().__init__(api_key=_openrouter_key, base_url=base_url, model=model)
+
+        self._bytez_client: BytezClient | None = (
+            BytezClient(api_key=bytez_key) if bytez_key else None
+        )
+        self._openrouter_available = bool(_openrouter_key)
         self._knowledge_base = knowledge_base if knowledge_base is not None else PentestKnowledgeBase()
+
+    def _send(self, prompt: str) -> dict:
+        """
+        Send prompt using provider priority:
+        1. Bytez AI (if key configured)
+        2. OpenRouter (if key configured)
+        3. Return empty response (triggers KB fallback)
+        """
+        # Try Bytez first
+        if self._bytez_client is not None:
+            resp = self._bytez_client.send_request(prompt)
+            if resp.get("status_code") == 200 and resp.get("raw_text"):
+                return resp
+            logger.warning("Bytez AI unavailable (status=%s), trying OpenRouter...", resp.get("status_code"))
+
+        # Try OpenRouter
+        if self._openrouter_available:
+            resp = self.send_request(prompt)
+            if resp.get("status_code") == 200 and resp.get("raw_text"):
+                return resp
+            logger.warning("OpenRouter unavailable (status=%s), using KB fallback.", resp.get("status_code"))
+
+        return {"raw_text": "", "status_code": 0}
 
     # ------------------------------------------------------------------
     # Public API
@@ -187,7 +226,7 @@ class AIEngine(AIClient):
         """
         try:
             prompt = self._build_todo_prompt(target, context)
-            response = self.send_request(prompt)
+            response = self._send(prompt)
 
             status_code = response.get("status_code", 0)
             raw_text = response.get("raw_text", "")
@@ -218,7 +257,7 @@ class AIEngine(AIClient):
         """
         try:
             prompt = self._build_phase_prompt(phase, result, context)
-            response = self.send_request(prompt)
+            response = self._send(prompt)
 
             status_code = response.get("status_code", 0)
             raw_text = response.get("raw_text", "")
@@ -244,7 +283,7 @@ class AIEngine(AIClient):
                 return []
 
             prompt = self._build_exploit_prompt(vulns)
-            response = self.send_request(prompt)
+            response = self._send(prompt)
 
             status_code = response.get("status_code", 0)
             raw_text = response.get("raw_text", "")
@@ -267,7 +306,7 @@ class AIEngine(AIClient):
         """
         try:
             prompt = self._build_report_prompt(full_state)
-            response = self.send_request(prompt)
+            response = self._send(prompt)
 
             status_code = response.get("status_code", 0)
             raw_text = response.get("raw_text", "")

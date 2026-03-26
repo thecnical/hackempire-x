@@ -77,9 +77,12 @@ TOOL_INSTALL_SPECS: dict[str, ToolInstallSpec] = {
     "smbmap":        ToolInstallSpec("smbmap",        "apt", "smbmap"),
     "sqlmap":        ToolInstallSpec("sqlmap",        "apt", "sqlmap"),
     "metasploit":    ToolInstallSpec("metasploit",    "apt", "metasploit-framework",  check_bin="msfconsole"),
-    "enum4linux-ng": ToolInstallSpec("enum4linux-ng", "apt", "enum4linux-ng"),
+    # enum4linux-ng: apt package name is enum4linux (Kali), NOT enum4linux-ng
+    "enum4linux-ng": ToolInstallSpec("enum4linux-ng", "apt", "enum4linux",            check_bin="enum4linux-ng"),
     "responder":     ToolInstallSpec("responder",     "apt", "responder"),
     "wafw00f":       ToolInstallSpec("wafw00f",       "apt", "wafw00f"),
+    # rustscan: fast port scanner, replaces naabu (which needs libpcap-dev + Go>=1.24)
+    "rustscan":      ToolInstallSpec("rustscan",      "apt", "rustscan"),
 
     # ── Go ───────────────────────────────────────────────────────────────────
     "subfinder":     ToolInstallSpec("subfinder",     "go", "github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"),
@@ -87,7 +90,9 @@ TOOL_INSTALL_SPECS: dict[str, ToolInstallSpec] = {
     "dnsx":          ToolInstallSpec("dnsx",          "go", "github.com/projectdiscovery/dnsx/cmd/dnsx@latest"),
     "shuffledns":    ToolInstallSpec("shuffledns",    "go", "github.com/projectdiscovery/shuffledns/cmd/shuffledns@latest"),
     "nuclei":        ToolInstallSpec("nuclei",        "go", "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"),
-    "naabu":         ToolInstallSpec("naabu",         "go", "github.com/projectdiscovery/naabu/v2/cmd/naabu@latest"),
+    # naabu: needs libpcap-dev + Go>=1.24 — install via apt with libpcap first
+    "naabu":         ToolInstallSpec("naabu",         "go", "github.com/projectdiscovery/naabu/v2/cmd/naabu@latest",
+                                     check_bin="naabu"),
     "interactsh-client": ToolInstallSpec("interactsh-client", "go", "github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"),
     "katana":        ToolInstallSpec("katana",        "go", "github.com/projectdiscovery/katana/cmd/katana@latest"),
     "hakrawler":     ToolInstallSpec("hakrawler",     "go", "github.com/hakluke/hakrawler@latest"),
@@ -104,25 +109,20 @@ TOOL_INSTALL_SPECS: dict[str, ToolInstallSpec] = {
     "afrog":         ToolInstallSpec("afrog",         "go", "github.com/zan8in/afrog/cmd/afrog@latest"),
     "jsluice":       ToolInstallSpec("jsluice",       "go", "github.com/BishopFox/jsluice/cmd/jsluice@latest"),
     "github-subdomains": ToolInstallSpec("github-subdomains", "go", "github.com/gwen001/github-subdomains@latest"),
-    # kiterunner: correct module path (v1.0.2 is latest, use direct binary download instead)
-    "kiterunner":    ToolInstallSpec("kiterunner",    "curl",
-                                     "https://github.com/assetnote/kiterunner/releases/latest/download/kr_linux_amd64.tar.gz",
+    # kiterunner: use pre-built binary from GitHub releases (correct URL format)
+    "kiterunner":    ToolInstallSpec("kiterunner",    "git",
+                                     "https://github.com/assetnote/kiterunner.git",
+                                     git_dest="/opt/kiterunner",
                                      check_bin="kr"),
 
-    # ── pip (isolated venvs) ─────────────────────────────────────────────────
-    # NOTE: these are installed into ~/.hackempire/venvs/<name>/ NOT system pip
+    # pip (isolated venvs) — only tools actually on PyPI
     "arjun":         ToolInstallSpec("arjun",         "pip", "arjun"),
     "waymore":       ToolInstallSpec("waymore",       "pip", "waymore"),
     "sslyze":        ToolInstallSpec("sslyze",        "pip", "sslyze"),
-    # bloodhound-python: correct pip package is 'bloodhound', binary is 'bloodhound-python'
     "bloodhound":    ToolInstallSpec("bloodhound",    "pip", "bloodhound",       check_bin="bloodhound-python"),
-    # impacket: binary is impacket-secretsdump
     "impacket":      ToolInstallSpec("impacket",      "pip", "impacket",         check_bin="impacket-secretsdump"),
-    # netexec: maintained fork of crackmapexec (correct PyPI name)
     "netexec":       ToolInstallSpec("netexec",       "pip", "netexec",          check_bin="nxc"),
-    # ldapdomaindump
     "ldapdomaindump":ToolInstallSpec("ldapdomaindump","pip", "ldapdomaindump"),
-    "enum4linux":    ToolInstallSpec("enum4linux",    "pip", "enum4linux-ng",    check_bin="enum4linux-ng"),
 
     # ── git clone ────────────────────────────────────────────────────────────
     # All git tools: skip clone if dest already exists (fixes "not empty dir" error)
@@ -241,7 +241,7 @@ class ToolInstaller:
         return InstallResult(tool=spec.name, status="failed", message=msg)
 
     def _run_apt(self, spec: ToolInstallSpec) -> None:
-        self._run_subprocess(["apt-get", "install", "-y", spec.package], spec.name)
+        self._run_subprocess(["sudo", "apt-get", "install", "-y", "--no-install-recommends", spec.package], spec.name)
 
     def _run_pip(self, spec: ToolInstallSpec) -> None:
         self._run_subprocess([sys.executable, "-m", "pip", "install", "--quiet", spec.package], spec.name)
@@ -258,6 +258,10 @@ class ToolInstaller:
         self._run_subprocess(cmd, spec.name)
 
     def _run_go(self, spec: ToolInstallSpec) -> None:
+        # naabu needs libpcap-dev
+        if spec.name == "naabu":
+            subprocess.run(["sudo", "apt-get", "install", "-y", "libpcap-dev"],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
         env = {**os.environ, "GOPATH": os.environ.get("GOPATH", str(Path.home() / "go"))}
         self._run_subprocess(["go", "install", spec.package], spec.name, env=env)
 
