@@ -88,6 +88,28 @@ class ToolDoctor:
     # Public API
     # ------------------------------------------------------------------
 
+    def fix_all_missing(self) -> list[DiagnosticReport]:
+        """
+        Power command: scan ALL known tools, force-install every missing one.
+        No prompts — auto-approves everything. Use with --doctor flag.
+        """
+        from installer.dependency_resolver import DependencyResolver
+        resolver = DependencyResolver(logger=self._logger, auto_approve=True)
+        all_tools = list(TOOL_INSTALL_SPECS.keys())
+        self._logger.info(f"[doctor] Force-installing {len(all_tools)} tools...")
+        results = resolver.resolve(all_tools)
+        reports: list[DiagnosticReport] = []
+        for tool, status in results.items():
+            if status in ("already_installed", "installed"):
+                continue
+            reports.append(DiagnosticReport(
+                tool=tool, issue="not_installed",
+                fix_attempted="reinstall",
+                fix_succeeded=(status == "installed"),
+                suggestion=self._manual_fix_suggestion(tool),
+            ))
+        return reports
+
     def diagnose_and_fix(
         self,
         tool_status: dict[str, str],
