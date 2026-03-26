@@ -60,6 +60,9 @@ install_go_tool() {
   info "Installing $name..."
   go install "$pkg" 2>/dev/null && ok "$name installed" || warn "$name failed"
 }
+export PATH="$PATH:$HOME/.local/bin"
+mkdir -p "$HOME/.local/bin"
+
 install_go_tool subfinder   github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
 install_go_tool httpx       github.com/projectdiscovery/httpx/cmd/httpx@latest
 install_go_tool dnsx        github.com/projectdiscovery/dnsx/cmd/dnsx@latest
@@ -77,6 +80,24 @@ install_go_tool jsluice     github.com/BishopFox/jsluice/cmd/jsluice@latest
 install_go_tool afrog       github.com/zan8in/afrog/cmd/afrog@latest
 install_go_tool kr          github.com/assetnote/kiterunner/cmd/kr@latest
 install_go_tool github-subdomains github.com/gwen001/github-subdomains@latest
+install_go_tool naabu       github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
+install_go_tool interactsh-client github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest
+install_go_tool chisel      github.com/jpillora/chisel@latest
+install_go_tool assetfinder github.com/tomnomnom/assetfinder@latest
+install_go_tool anew        github.com/tomnomnom/anew@latest
+install_go_tool qsreplace   github.com/tomnomnom/qsreplace@latest
+
+# ligolo-ng proxy
+if ! command -v proxy &>/dev/null; then
+  info "Installing ligolo-ng..."
+  go install github.com/nicocha30/ligolo-ng/cmd/proxy@latest 2>/dev/null && ok "ligolo-ng installed" || warn "ligolo-ng failed"
+fi
+
+# trufflehog: needs Go >= 1.24, use pre-built binary
+if ! command -v trufflehog &>/dev/null; then
+  info "Installing trufflehog via binary release..."
+  curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sudo sh -s -- -b /usr/local/bin 2>/dev/null && ok "trufflehog installed" || warn "trufflehog failed"
+fi
 
 # ── 4. Git-cloned tools ──────────────────────────────────────────────────────
 section "Git tools"
@@ -89,8 +110,11 @@ clone_tool() {
 clone_tool dirsearch  https://github.com/maurosoria/dirsearch.git    /opt/dirsearch
 clone_tool xsstrike   https://github.com/s0md3v/XSStrike.git         /opt/xsstrike
 clone_tool commix     https://github.com/commixproject/commix.git    /opt/commix
+clone_tool tplmap     https://github.com/epinna/tplmap.git           /opt/tplmap
 clone_tool testssl    https://github.com/drwetter/testssl.sh.git     /opt/testssl
 clone_tool peass      https://github.com/carlospolop/PEASS-ng.git    /opt/peass
+clone_tool ghauri     https://github.com/r0oth3x49/ghauri.git        /opt/ghauri
+clone_tool paramspider https://github.com/devanshbatham/ParamSpider.git /opt/paramspider
 clone_tool sqlmap     https://github.com/sqlmapproject/sqlmap.git    /opt/sqlmap
 
 # Add /opt/sqlmap to PATH if sqlmap not already available
@@ -127,13 +151,34 @@ install_pip_venv() {
 }
 
 install_pip_venv arjun       arjun
-install_pip_venv paramspider paramspider
-install_pip_venv ghauri      ghauri
+install_pip_venv waymore     waymore
+install_pip_venv sslyze      sslyze
 install_pip_venv impacket    impacket
-install_pip_venv crackmapexec crackmapexec
+install_pip_venv netexec     netexec
 install_pip_venv bloodhound  bloodhound
 install_pip_venv xsstrike    requests fuzzywuzzy
-install_pip_venv sqlmap      sqlmap
+install_pip_venv ldapdomaindump ldapdomaindump
+
+# Install requirements for git-cloned pip tools
+for tool_dir in /opt/ghauri /opt/paramspider /opt/commix /opt/tplmap /opt/xsstrike; do
+  if [ -f "$tool_dir/requirements.txt" ]; then
+    name=$(basename "$tool_dir")
+    info "Installing requirements for $name..."
+    python3 -m venv "$VENV_BASE/$name" 2>/dev/null || true
+    "$VENV_BASE/$name/bin/pip" install --quiet -r "$tool_dir/requirements.txt" 2>/dev/null && ok "$name deps installed" || warn "$name deps failed"
+  fi
+done
+
+# Symlink venv binaries to ~/.local/bin
+for tool_bin in arjun waymore sslyze nxc bloodhound-python impacket-secretsdump ldapdomaindump; do
+  for venv_dir in "$VENV_BASE"/*/; do
+    bin_path="$venv_dir/bin/$tool_bin"
+    if [ -f "$bin_path" ]; then
+      ln -sf "$bin_path" "$HOME/.local/bin/$tool_bin" 2>/dev/null && ok "Linked $tool_bin" || true
+      break
+    fi
+  done
+done
 
 # ── 7. Launcher script ───────────────────────────────────────────────────────
 section "Launcher"
