@@ -298,6 +298,31 @@ class AIEngine(AIClient):
             logger.error("suggest_exploits error: %s", exc)
             return self._kb_exploit_suggestions(vulns)
 
+    def verify_finding(self, prompt: str) -> float | None:
+        """
+        Public method for FalsePositiveFilter to verify a finding via AI.
+        Returns confidence float (0.0-1.0) or None if AI unavailable.
+        """
+        try:
+            response = self._send(prompt)
+            if response.get("status_code") != 200 or not response.get("raw_text"):
+                return None
+            raw = response["raw_text"].strip()
+            brace = raw.find("{")
+            if brace == -1:
+                return None
+            import json as _json
+            data = _json.loads(raw[brace:])
+            if not isinstance(data, dict):
+                return None
+            is_real = data.get("real", True)
+            confidence = float(data.get("confidence", 0.5))
+            confidence = max(0.0, min(1.0, confidence))
+            return confidence if is_real else (confidence * 0.2)
+        except Exception as exc:
+            logger.debug(f"[ai_engine] verify_finding failed: {exc}")
+            return None
+
     def filter_false_positives(
         self,
         vulns: list[Vulnerability],
@@ -503,20 +528,10 @@ class AIEngine(AIClient):
             suggested_tools=[str(t) for t in suggested_tools],
             exploit_chains=[str(c) for c in exploit_chains],
             confidence=confidence,
+            attack_surface=[str(x) for x in attack_surface] if isinstance(attack_surface, list) else [],
+            priority_targets=[str(x) for x in priority_targets] if isinstance(priority_targets, list) else [],
+            vuln_hypotheses=[str(x) for x in vuln_hypotheses] if isinstance(vuln_hypotheses, list) else [],
         )
-        # Attach extra intelligence as dynamic attributes
-        if attack_surface:
-            object.__setattr__(decision, "attack_surface", attack_surface) if hasattr(decision, "__slots__") else setattr(decision, "attack_surface", attack_surface)
-        if priority_targets:
-            try:
-                decision.priority_targets = priority_targets  # type: ignore[attr-defined]
-            except Exception:
-                pass
-        if vuln_hypotheses:
-            try:
-                decision.vuln_hypotheses = vuln_hypotheses  # type: ignore[attr-defined]
-            except Exception:
-                pass
         return decision
 
     def _parse_suggestions(self, raw_text: str) -> list[str]:

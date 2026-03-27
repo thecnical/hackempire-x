@@ -69,6 +69,10 @@ class AIDecision:
     suggested_tools: list[str] = field(default_factory=list)
     exploit_chains: list[str] = field(default_factory=list)
     confidence: float = 0.0
+    # Phase 2 — AI Brain upgrade fields
+    attack_surface: list[str] = field(default_factory=list)
+    priority_targets: list[str] = field(default_factory=list)
+    vuln_hypotheses: list[str] = field(default_factory=list)
 
 
 @dataclass

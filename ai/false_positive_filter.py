@@ -24,9 +24,15 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONFIDENCE_THRESHOLD = 0.60
 
 # Patterns that are almost always false positives
-_FP_INDICATORS = [
-    "test", "example", "demo", "placeholder", "dummy",
-    "localhost", "127.0.0.1", "0.0.0.0",
+# NOTE: Use full-word matching to avoid false filtering of valid targets
+# e.g. "testphp.vulnweb.com" is a valid bug bounty target
+_FP_URL_PATTERNS = [
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "example.com",
+    "placeholder",
+    "dummy",
 ]
 
 # Vuln names that scanners commonly false-positive on
@@ -158,11 +164,11 @@ class FalsePositiveFilter:
 
         # Filter if URL contains obvious FP indicators
         url_lower = (vuln.url or "").lower()
-        for indicator in _FP_INDICATORS:
+        for indicator in _FP_URL_PATTERNS:
             if indicator in url_lower and vuln.severity in ("info", "low"):
                 return FilterResult(
                     vuln=vuln, kept=False,
-                    reason=f"fp_indicator_{indicator}",
+                    reason=f"fp_url_{indicator.replace('.', '_')}",
                     final_confidence=vuln.confidence,
                 )
 
@@ -183,30 +189,34 @@ class FalsePositiveFilter:
         """
         try:
             prompt = self._build_verify_prompt(vuln)
-            response = self._ai._send(prompt)
-
-            if response.get("status_code") != 200 or not response.get("raw_text"):
-                return None
-
-            return self._parse_verify_response(response["raw_text"])
+            # Use public verify_finding method if available, else _send as fallback
+            if hasattr(self._ai, "verify_finding"):
+                return self._ai.verify_finding(prompt)
+            elif hasattr(self._ai, "_send"):
+                response = self._ai._send(prompt)
+                if response.get("status_code") != 200 or not response.get("raw_text"):
+                    return None
+                return self._parse_verify_response(response["raw_text"])
+            return None
         except Exception as exc:
             logger.debug(f"[fp_filter] AI verify failed: {exc}")
             return None
 
     def _build_verify_prompt(self, vuln: Vulnerability) -> str:
+        tool_str = ", ".join(vuln.tool_sources) if vuln.tool_sources else "unknown"
         return (
             "You are a senior penetration tester reviewing scanner findings.\n\n"
             f"Vulnerability: {vuln.name}\n"
             f"Severity: {vuln.severity}\n"
             f"URL: {vuln.url}\n"
-            f"Evidence: {(vuln.evidence or '')[:300]}\n"
-            f"Tool: {', '.join(vuln.tool_sources)}\n"
+            f"Evidence: {(vuln.evidence or 'none')[:300]}\n"
+            f"Tool: {tool_str}\n"
             f"Scanner confidence: {vuln.confidence:.0%}\n\n"
             "Is this a real vulnerability or a false positive?\n"
             "Consider: Is the evidence convincing? Is the URL realistic? "
             "Does the evidence match the vulnerability type?\n\n"
-            'OUTPUT (strict JSON only): {"real": true/false, "confidence": 0.0-1.0, "reason": "..."}\n'
-            "RULES: Output ONLY valid JSON. No explanation."
+            'OUTPUT (strict JSON only): {"real": true, "confidence": 0.85, "reason": "..."}\n'
+            "RULES: Output ONLY valid JSON. No explanation. No markdown."
         )
 
     def _parse_verify_response(self, raw_text: str) -> float | None:
