@@ -355,31 +355,13 @@ def cmd_scan(
             console.print("[dim]Ultra mode cancelled.[/dim]")
             return 1
 
-        # Ultra = stealth + exploit + web + auto-export
-        import os as _os
-        _os.environ["HACKEMPIRE_RATE_LIMIT_RPS"] = "2"
-        web = True
         # Auto-fix missing tools before scan
         _auto_fix_missing_tools(console, logger)
-        # Run as exploit mode internally (full pipeline)
-        exit_code = _run_v2_scan(
+        # Delegate to _run_v2_scan which handles ultra internally
+        return _run_v2_scan(
             console=console, logger=logger, target=target,
-            mode="exploit", ai_key=ai_key, web=True, proxy=proxy,
+            mode="ultra", ai_key=ai_key, web=True, proxy=proxy,
         )
-        # Auto-export all formats after scan
-        console.print("\n[bold cyan]Auto-exporting reports...[/bold cyan]")
-        for fmt in ("json", "html", "pdf"):
-            try:
-                cmd_report(console=console, fmt=fmt)
-            except Exception:
-                pass
-        console.print(Panel(
-            f"[bold green]ULTRA scan complete: {target}[/bold green]\n\n"
-            "  Reports saved: hackempire_report_*.json / .html / .pdf\n"
-            "  Dashboard: https://127.0.0.1:5443/dashboard",
-            border_style="green",
-        ))
-        return exit_code
 
     # ------------------------------------------------------------------
     # Exploit mode — require explicit confirmation
@@ -392,16 +374,6 @@ def cmd_scan(
                 "Only proceed if you have explicit written authorisation for this target.\n\n"
                 "[bold yellow]Type CONFIRM to proceed:[/bold yellow]",
                 border_style="red",
-                title="[bold red]EXPLOIT MODE[/bold red]",
-            )
-        )
-        try:
-            answer = input("> ").strip()
-        except (EOFError, OSError):
-            answer = ""
-        if answer != "CONFIRM":
-            console.print("[dim]Exploit mode cancelled.[/dim]")
-            return 1
                 title="[bold red]EXPLOIT MODE[/bold red]",
             )
         )
@@ -443,9 +415,9 @@ def cmd_scan(
             logger.warning(f"Web dashboard failed to start: {exc}")
 
     # ------------------------------------------------------------------
-    # OrchestratorV2 path — full, exploit, stealth modes
+    # OrchestratorV2 path — full, exploit, stealth, ultra modes
     # ------------------------------------------------------------------
-    if mode in ("full", "exploit", "stealth", "ultra"):
+    if mode in ("full", "exploit", "stealth"):
         return _run_v2_scan(
             console=console,
             logger=logger,
