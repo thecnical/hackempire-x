@@ -112,10 +112,10 @@ def _build_parser() -> argparse.ArgumentParser:
     # ------------------------------------------------------------------
     config_parser = subparsers.add_parser(
         "config",
-        help="Set a configuration key/value in .hackempire/config.json",
+        help="Set or show configuration in ~/.hackempire/config.json",
     )
-    config_parser.add_argument("key", help="Configuration key")
-    config_parser.add_argument("value", help="Configuration value")
+    config_parser.add_argument("key", nargs="?", default=None, help="Config key (or 'show' to display all)")
+    config_parser.add_argument("value", nargs="?", default=None, help="Config value")
 
     # ------------------------------------------------------------------
     # Legacy positional target (kept for backward compatibility)
@@ -209,6 +209,7 @@ def run_cli(argv: Optional[list[str]] = None) -> int:
     from cli.commands import (
         cmd_status, cmd_doctor, cmd_clean, cmd_uninstall,
         cmd_scan, cmd_report, cmd_install_tools, cmd_terminal, cmd_config,
+        cmd_config_show,
     )
 
     if args.subcommand == "scan":
@@ -232,6 +233,11 @@ def run_cli(argv: Optional[list[str]] = None) -> int:
         return cmd_terminal(console=console)
 
     if args.subcommand == "config":
+        if args.key is None or args.key == "show":
+            return cmd_config_show(console=console)
+        if args.value is None:
+            console.print(f"[bold red]Error:[/bold red] provide a value: ./hackempire config {args.key} YOUR_VALUE")
+            return 2
         return cmd_config(console=console, key=args.key, value=args.value)
 
     # -----------------------------------------------------------------------
