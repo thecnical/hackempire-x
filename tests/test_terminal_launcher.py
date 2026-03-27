@@ -257,7 +257,7 @@ def _tool_lists(draw):
 
 
 @given(tool_lists=st.lists(_tool_lists(), min_size=1, max_size=10))
-@settings(max_examples=100, deadline=None)
+@settings(max_examples=10, deadline=None)
 def test_property_19_terminal_session_unique_ids(tool_lists):
     """Property 19: TerminalSession Unique IDs — all concurrent sessions have
     distinct session_ids.

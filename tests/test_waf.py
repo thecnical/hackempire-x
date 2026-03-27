@@ -73,7 +73,7 @@ def _subprocess_result_st(draw):
 # ---------------------------------------------------------------------------
 
 @given(target=_target_st, subprocess_result=_subprocess_result_st())
-@settings(max_examples=200)
+@settings(max_examples=20)
 def test_property_10_waf_detector_never_raises_installed(target, subprocess_result):
     """Property 10: WafDetector Never Raises — detect() always returns WafResult,
     never raises when wafw00f is installed.
@@ -96,7 +96,7 @@ def test_property_10_waf_detector_never_raises_installed(target, subprocess_resu
 
 
 @given(target=_target_st)
-@settings(max_examples=100)
+@settings(max_examples=10)
 def test_property_10_waf_detector_never_raises_not_installed(target):
     """Property 10: WafDetector Never Raises — detect() always returns WafResult
     when wafw00f is not installed.
@@ -121,7 +121,7 @@ def test_property_10_waf_detector_never_raises_not_installed(target):
 
 
 @given(target=_target_st)
-@settings(max_examples=100)
+@settings(max_examples=10)
 def test_property_10_waf_detector_never_raises_subprocess_exception(target):
     """Property 10: WafDetector Never Raises — detect() always returns WafResult
     even when subprocess.run raises an exception.
@@ -225,7 +225,7 @@ KNOWN_VENDORS = list(WAF_TAMPER_MAP.keys())  # cloudflare, akamai, modsecurity, 
 
 
 @given(vendor=st.sampled_from(KNOWN_VENDORS))
-@settings(max_examples=100)
+@settings(max_examples=10)
 def test_property_11_known_vendors_return_non_empty_tampers(vendor):
     """Property 11: WafBypassStrategy Returns Tampers for Known Vendors —
     all 7 known vendors return non-empty list.

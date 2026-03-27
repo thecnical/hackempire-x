@@ -148,3 +148,54 @@ class RealTimeEmitter:
                 "data": data,
             },
         )
+
+    def emit_autonomous_decision(self, decision: Any) -> None:
+        """Broadcast an AutonomousEngine decision to the AutonomousFeed panel."""
+        try:
+            payload: dict = {
+                "event": "autonomous_decision",
+                "timestamp": _now_iso(),
+            }
+            if hasattr(decision, "action"):
+                payload["action"] = decision.action.value if hasattr(decision.action, "value") else str(decision.action)
+                payload["phase"] = decision.phase
+                payload["reason"] = decision.reason
+                payload["next_tool"] = decision.next_tool
+            else:
+                payload["decision"] = decision
+            self._emit("autonomous_decision", payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("RealTimeEmitter: failed to emit autonomous_decision: %s", exc)
+
+    def emit_finding_update(self, finding: Any) -> None:
+        """Broadcast a confirmed finding update to AttackGraph + MITREOverlay panels."""
+        self._emit(
+            "finding_update",
+            {
+                "event": "finding_update",
+                "timestamp": _now_iso(),
+                "finding": finding,
+            },
+        )
+
+    def emit_poc_ready(self, poc: Any) -> None:
+        """Broadcast a generated PoC to the PoCPreview panel."""
+        self._emit(
+            "poc_ready",
+            {
+                "event": "poc_ready",
+                "timestamp": _now_iso(),
+                "poc": poc,
+            },
+        )
+
+    def emit_kb_update(self, entry: Any) -> None:
+        """Broadcast a KB entry update to the KBViewer panel."""
+        self._emit(
+            "kb_update",
+            {
+                "event": "kb_update",
+                "timestamp": _now_iso(),
+                "entry": entry,
+            },
+        )

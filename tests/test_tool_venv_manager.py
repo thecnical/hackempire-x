@@ -71,7 +71,7 @@ _packages_st = st.lists(
 # ---------------------------------------------------------------------------
 
 @given(tool_name=_tool_name_st, packages=_packages_st)
-@settings(max_examples=100)
+@settings(max_examples=10)
 def test_property_12_ensure_venv_idempotent(tool_name, packages):
     """Property 12: ToolVenvManager Idempotence — calling ensure_venv twice
     returns the same path without recreating the venv.

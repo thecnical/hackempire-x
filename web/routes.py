@@ -275,8 +275,146 @@ def report_json() -> Response:
 
 @bp.route("/api/state")
 def api_state() -> Response:
-    """Raw state JSON for debugging."""
-    return jsonify(read_state())
+    """Raw state JSON for debugging, extended with v4 keys for state replay."""
+    state = read_state()
+    # v4.6: include new panel data with empty defaults for state replay
+    state.setdefault("attack_graph", {"nodes": [], "edges": []})
+    state.setdefault("mitre_overlay", [])
+    state.setdefault("poc_preview", {})
+    state.setdefault("autonomous_feed", [])
+    state.setdefault("kb_entries", [])
+    return jsonify(state)
+
+
+# ---------------------------------------------------------------------------
+# v4.6 Dashboard v2 routes
+# ---------------------------------------------------------------------------
+
+@bp.route("/api/attack-graph")
+def api_attack_graph() -> Response:
+    """Return graph data for the AttackGraph panel.
+
+    Nodes represent discovered hosts/services; edges represent exploit paths.
+    Falls back to empty graph when no scan data is available.
+    """
+    state = read_state()
+    # Return pre-built attack_graph if present in state (written by OrchestratorV2)
+    graph = state.get("attack_graph")
+    if isinstance(graph, dict) and "nodes" in graph and "edges" in graph:
+        return jsonify(graph)
+
+    # Build a minimal graph from existing scan state
+    data = state.get("data") or {}
+    recon = data.get("recon") or {}
+    vuln = data.get("vuln") or {}
+
+    nodes: list[dict] = []
+    edges: list[dict] = []
+
+    target = state.get("target") or ""
+    if target:
+        nodes.append({"id": "target", "label": target, "type": "host"})
+
+    for port_info in (recon.get("ports") or [])[:50]:
+        if not isinstance(port_info, dict):
+            continue
+        port = port_info.get("port")
+        service = port_info.get("service", "unknown")
+        if port is None:
+            continue
+        node_id = f"svc_{port}"
+        nodes.append({"id": node_id, "label": f"{port}/{service}", "type": "service"})
+        if target:
+            edges.append({"from": "target", "to": node_id, "label": "open"})
+
+    for vuln_item in (vuln.get("vulnerabilities") or [])[:20]:
+        if not isinstance(vuln_item, dict):
+            continue
+        name = vuln_item.get("name") or vuln_item.get("title") or "vuln"
+        url = vuln_item.get("url") or ""
+        node_id = f"vuln_{name[:30]}"
+        nodes.append({"id": node_id, "label": name, "type": "exploit_path"})
+        if url:
+            edges.append({"from": "target", "to": node_id, "label": "exploitable"})
+
+    return jsonify({"nodes": nodes, "edges": edges})
+
+
+@bp.route("/api/mitre-overlay")
+def api_mitre_overlay() -> Response:
+    """Return MITRE ATT&CK overlay data for confirmed findings.
+
+    Each entry has ``finding``, ``technique_id``, and ``tactic`` fields.
+    Falls back to empty list when no data is available.
+    """
+    state = read_state()
+    # Return pre-built overlay if present
+    overlay = state.get("mitre_overlay")
+    if isinstance(overlay, list):
+        return jsonify(overlay)
+
+    # Build from scan state using mitre_mapper if available
+    data = state.get("data") or {}
+    vuln = data.get("vuln") or {}
+    vulns = vuln.get("vulnerabilities") or []
+
+    result: list[dict] = []
+    try:
+        from ai.mitre_mapper import map_finding
+        for v in vulns:
+            if not isinstance(v, dict):
+                continue
+            name = v.get("name") or v.get("title") or ""
+            mapping = map_finding(name)
+            result.append({
+                "finding": name,
+                "technique_id": mapping.get("technique_id", ""),
+                "tactic": mapping.get("tactic", ""),
+            })
+    except Exception:
+        pass
+
+    return jsonify(result)
+
+
+@bp.route("/api/kb")
+def api_kb() -> Response:
+    """Return KBEntry records for the current scan target.
+
+    Falls back to empty list when no KB data is available.
+    """
+    state = read_state()
+    # Return pre-built kb_entries if present
+    kb_entries = state.get("kb_entries")
+    if isinstance(kb_entries, list):
+        return jsonify(kb_entries)
+
+    target = state.get("target") or ""
+    if not target:
+        return jsonify([])
+
+    try:
+        from core.kb_manager import KnowledgeBaseManager
+        kb = KnowledgeBaseManager()
+        entries = kb.search(target)
+        return jsonify([e.to_dict() for e in entries])
+    except Exception:
+        return jsonify([])
+
+
+@bp.route("/api/autonomous-feed")
+def api_autonomous_feed() -> Response:
+    """Return recent AutonomousDecision records for the AutonomousFeed panel.
+
+    Falls back to empty list when not in autonomous mode or no decisions recorded.
+    """
+    state = read_state()
+    # Return pre-built autonomous_feed if present
+    feed = state.get("autonomous_feed")
+    if isinstance(feed, list):
+        return jsonify(feed)
+
+    return jsonify([])
 
 
 @bp.route("/api/report/pdf")

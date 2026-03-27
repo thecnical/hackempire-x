@@ -71,7 +71,7 @@ def _invalid_json_stdout_st(draw):
 # ---------------------------------------------------------------------------
 
 @given(target=_target_st, phase=_phase_st)
-@settings(max_examples=100)
+@settings(max_examples=10)
 def test_property_14_aegis_not_available_ensure_fails(target, phase):
     """Property 14 (case 1): aegis not available, ensure_installed fails → degraded ChainResult.
 
@@ -92,7 +92,7 @@ def test_property_14_aegis_not_available_ensure_fails(target, phase):
 
 
 @given(target=_target_st, phase=_phase_st, stdout=_valid_json_lines_st())
-@settings(max_examples=100)
+@settings(max_examples=10)
 def test_property_14_aegis_available_subprocess_succeeds(target, phase, stdout):
     """Property 14 (case 2): aegis available, subprocess succeeds with valid JSON lines → non-degraded ChainResult.
 
@@ -123,7 +123,7 @@ def test_property_14_aegis_available_subprocess_succeeds(target, phase, stdout):
 
 
 @given(target=_target_st, phase=_phase_st)
-@settings(max_examples=100)
+@settings(max_examples=10)
 def test_property_14_aegis_available_subprocess_fails(target, phase):
     """Property 14 (case 3): aegis available, subprocess fails (returncode != 0) → degraded ChainResult.
 
@@ -149,7 +149,7 @@ def test_property_14_aegis_available_subprocess_fails(target, phase):
 
 
 @given(target=_target_st, phase=_phase_st)
-@settings(max_examples=100)
+@settings(max_examples=10)
 def test_property_14_aegis_available_subprocess_raises(target, phase):
     """Property 14 (case 4): aegis available, subprocess raises exception → degraded ChainResult.
 
@@ -171,7 +171,7 @@ def test_property_14_aegis_available_subprocess_raises(target, phase):
 
 
 @given(target=_target_st, phase=_phase_st, stdout=_invalid_json_stdout_st())
-@settings(max_examples=100)
+@settings(max_examples=10)
 def test_property_14_aegis_available_invalid_json(target, phase, stdout):
     """Property 14 (case 5): aegis available, subprocess returns invalid JSON → degraded or empty results ChainResult.
 

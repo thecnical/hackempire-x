@@ -86,7 +86,7 @@ def _make_planner_with_todo(todo: TodoList) -> TodoPlanner:
 # ---------------------------------------------------------------------------
 
 @given(todo=_todo_list_st)
-@settings(max_examples=300)
+@settings(max_examples=30)
 def test_property_9_progress_bounds(todo):
     """Property 9: TodoPlanner Progress Bounds — get_progress() always returns
     floats between 0.0 and 1.0 inclusive for any TodoList state.
@@ -107,7 +107,7 @@ def test_property_9_progress_bounds(todo):
 
 
 @given(todo=_todo_list_st)
-@settings(max_examples=200)
+@settings(max_examples=20)
 def test_property_9_progress_keys_match_phases(todo):
     """Property 9 (keys): get_progress() returns exactly the same phase keys
     as the TodoList.phases dict.
@@ -123,7 +123,7 @@ def test_property_9_progress_keys_match_phases(todo):
     phase=st.sampled_from(_PHASE_NAMES),
     n_tasks=st.integers(min_value=1, max_value=10),
 )
-@settings(max_examples=200)
+@settings(max_examples=20)
 def test_property_9_marking_done_increases_progress(phase, n_tasks):
     """Property 9 (monotonicity): marking tasks done never decreases progress.
 

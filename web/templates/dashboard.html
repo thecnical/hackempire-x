@@ -165,7 +165,7 @@
 {% endif %}
 
 <!-- ── Terminal ── -->
-<div class="row g-2">
+<div class="row g-2 mb-3">
   <div class="col-12">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
@@ -178,9 +178,143 @@
     </div>
   </div>
 </div>
+
+<!-- ── v4 Panels ── -->
+<div class="row g-2 mb-2">
+  <div class="col-12">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      {% for tab_id, tab_label in [('tab-attack-graph','⬡ ATTACK GRAPH'),('tab-mitre','◈ MITRE OVERLAY'),('tab-poc','☠ POC PREVIEW'),('tab-autofeed','◈ AUTONOMOUS FEED'),('tab-kb','⬢ KB VIEWER')] %}
+      <button class="v4-tab-btn{% if loop.first %} active{% endif %}" data-tab="{{ tab_id }}" onclick="switchV4Tab('{{ tab_id }}')">{{ tab_label }}</button>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- AttackGraph panel -->
+<div id="tab-attack-graph" class="v4-panel row g-2 mb-3">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">⬡ ATTACK GRAPH — Hosts &amp; Exploit Paths</div>
+      <div class="card-body p-1" style="position:relative;">
+        <div id="attack-graph-container" style="height:380px;background:#050d1a;border:1px solid #0f3460;border-radius:4px;"></div>
+        <p id="attack-graph-empty" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--muted);font-size:.8rem;pointer-events:none;">No data yet</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MITREOverlay panel -->
+<div id="tab-mitre" class="v4-panel row g-2 mb-3" style="display:none;">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">◈ MITRE ATT&amp;CK OVERLAY</div>
+      <div class="card-body p-2">
+        <div id="mitre-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:4px;"></div>
+        <p id="mitre-empty" style="color:var(--muted);font-size:.8rem;text-align:center;margin-top:1rem;">No findings mapped yet</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PoCPreview panel -->
+<div id="tab-poc" class="v4-panel row g-2 mb-3" style="display:none;">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">☠ POC PREVIEW — Latest Generated Payload</div>
+      <div class="card-body p-3">
+        <p id="poc-empty" style="color:var(--muted);font-size:.8rem;">No PoC generated yet</p>
+        <div id="poc-content" style="display:none;">
+          <div style="margin-bottom:.75rem;">
+            <div style="font-size:.65rem;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">AFFECTED URL</div>
+            <div id="poc-url" style="color:var(--accent2);font-family:var(--font-mono);font-size:.8rem;word-break:break-all;"></div>
+          </div>
+          <div>
+            <div style="font-size:.65rem;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">CURL COMMAND</div>
+            <pre id="poc-curl" style="background:#050d1a;border:1px solid #0f3460;border-radius:4px;padding:.75rem;color:#00ff9f;font-size:.75rem;white-space:pre-wrap;word-break:break-all;margin:0;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AutonomousFeed panel -->
+<div id="tab-autofeed" class="v4-panel row g-2 mb-3" style="display:none;">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">◈ AUTONOMOUS FEED — AI Decision Log</div>
+      <div class="card-body p-0" id="autofeed-list" style="max-height:380px;overflow-y:auto;">
+        <p id="autofeed-empty" class="p-3 mb-0" style="color:var(--muted);font-size:.8rem;">No autonomous decisions yet</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- KBViewer panel -->
+<div id="tab-kb" class="v4-panel row g-2 mb-3" style="display:none;">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>⬢ KB VIEWER — Knowledge Base Entries</span>
+        <input id="kb-search" type="text" placeholder="Search…" oninput="filterKB()" style="background:#050d1a;border:1px solid #0f3460;color:#e0e0e0;padding:3px 8px;font-size:.72rem;border-radius:3px;width:180px;font-family:var(--font-mono);">
+      </div>
+      <div class="card-body p-0">
+        <p id="kb-empty" class="p-3 mb-0" style="color:var(--muted);font-size:.8rem;">No KB entries yet</p>
+        <table class="table table-sm mb-0" id="kb-table" style="display:none;">
+          <thead><tr><th>TARGET</th><th>FINDINGS</th><th>PAYLOADS</th><th>TIMESTAMP</th></tr></thead>
+          <tbody id="kb-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<style>
+.v4-tab-btn {
+  background: #050d1a;
+  border: 1px solid #0f3460;
+  color: #4a7a9b;
+  padding: 4px 12px;
+  font-size: .68rem;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 1px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all .2s;
+}
+.v4-tab-btn.active, .v4-tab-btn:hover {
+  border-color: #00ff9f;
+  color: #00ff9f;
+  background: #071a2e;
+}
+.mitre-cell {
+  background: #050d1a;
+  border: 1px solid #0f3460;
+  border-radius: 3px;
+  padding: 5px 6px;
+  font-size: .65rem;
+  font-family: var(--font-mono, monospace);
+  color: #4a7a9b;
+  transition: all .3s;
+}
+.mitre-cell.hit {
+  background: rgba(0,255,159,.12);
+  border-color: #00ff9f;
+  color: #00ff9f;
+}
+.autofeed-entry {
+  padding: 6px 12px;
+  border-bottom: 1px solid #0f3460;
+  font-size: .72rem;
+  font-family: var(--font-mono, monospace);
+}
+.autofeed-entry .af-phase { color: var(--accent, #00ff9f); margin-right: 6px; }
+.autofeed-entry .af-action { color: #ffd700; margin-right: 6px; }
+.autofeed-entry .af-reason { color: #a0a0a0; }
+</style>
 <script>
 (function(){
 'use strict';
@@ -312,19 +446,249 @@ if (netCtx) {
   });
 }
 
+// ── v4 Tab switcher ───────────────────────────────────────────────────────
+window.switchV4Tab = function(tabId) {
+  document.querySelectorAll('.v4-panel').forEach(function(p){ p.style.display = 'none'; });
+  document.querySelectorAll('.v4-tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  var panel = document.getElementById(tabId);
+  if (panel) panel.style.display = '';
+  var btn = document.querySelector('[data-tab="' + tabId + '"]');
+  if (btn) btn.classList.add('active');
+};
+
+// ── AttackGraph (vis.js) ──────────────────────────────────────────────────
+var agNodes = new vis.DataSet([]);
+var agEdges = new vis.DataSet([]);
+var agNetwork = null;
+
+function initAttackGraph() {
+  var container = document.getElementById('attack-graph-container');
+  if (!container || typeof vis === 'undefined') return;
+  var data = { nodes: agNodes, edges: agEdges };
+  var options = {
+    nodes: {
+      shape: 'dot', size: 14,
+      font: { color: '#a0c4d8', size: 11, face: 'Share Tech Mono, monospace' },
+      borderWidth: 1,
+      color: { background: '#071a2e', border: '#0f3460', highlight: { background: '#0f3460', border: '#00ff9f' } }
+    },
+    edges: {
+      arrows: 'to',
+      color: { color: '#0f3460', highlight: '#00ff9f' },
+      font: { color: '#4a7a9b', size: 9, face: 'Share Tech Mono, monospace' },
+      smooth: { type: 'curvedCW', roundness: 0.2 }
+    },
+    physics: { stabilization: { iterations: 80 }, barnesHut: { gravitationalConstant: -3000 } },
+    interaction: { hover: true, tooltipDelay: 200 },
+    background: { color: '#050d1a' }
+  };
+  agNetwork = new vis.Network(container, data, options);
+}
+
+function agNodeId(host) { return 'h_' + host.replace(/[^a-zA-Z0-9_]/g, '_'); }
+
+function applyAttackGraphData(graphData) {
+  var empty = document.getElementById('attack-graph-empty');
+  var nodes = graphData.nodes || [];
+  var edges = graphData.edges || [];
+  if (nodes.length === 0 && edges.length === 0) return;
+  if (empty) empty.style.display = 'none';
+  nodes.forEach(function(n) {
+    var id = n.id || agNodeId(n.label || n.host || String(Math.random()));
+    if (!agNodes.get(id)) agNodes.add({ id: id, label: n.label || n.host || id, title: n.service || '' });
+  });
+  edges.forEach(function(e) {
+    var eid = (e.from || '') + '_' + (e.to || '') + '_' + (e.label || '');
+    if (!agEdges.get(eid)) agEdges.add({ id: eid, from: e.from, to: e.to, label: e.label || e.exploit_path || '' });
+  });
+}
+
+function handleFindingUpdateForGraph(d) {
+  var empty = document.getElementById('attack-graph-empty');
+  if (empty) empty.style.display = 'none';
+  var host = d.host || d.target || 'unknown';
+  var service = d.service || '';
+  var exploitPath = d.exploit_path || d.name || '';
+  var hostId = agNodeId(host);
+  if (!agNodes.get(hostId)) agNodes.add({ id: hostId, label: host, title: service });
+  if (exploitPath) {
+    var vulnId = 'v_' + exploitPath.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 30);
+    if (!agNodes.get(vulnId)) agNodes.add({ id: vulnId, label: exploitPath.slice(0, 20), title: exploitPath, color: { background: '#1a0a00', border: '#ff6b00' } });
+    var eid = hostId + '_' + vulnId;
+    if (!agEdges.get(eid)) agEdges.add({ id: eid, from: hostId, to: vulnId, label: service });
+  }
+}
+
+// ── MITREOverlay ──────────────────────────────────────────────────────────
+var mitreHits = {};
+
+function renderMitreCell(techniqueId, tactic) {
+  var grid = document.getElementById('mitre-grid');
+  var empty = document.getElementById('mitre-empty');
+  if (!grid) return;
+  var cellId = 'mitre-' + techniqueId.replace(/[^a-zA-Z0-9]/g, '_');
+  var existing = document.getElementById(cellId);
+  if (existing) {
+    existing.classList.add('hit');
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  var cell = document.createElement('div');
+  cell.className = 'mitre-cell hit';
+  cell.id = cellId;
+  cell.title = tactic || '';
+  cell.innerHTML = '<div style="font-weight:bold;">' + techniqueId + '</div>' +
+    '<div style="color:#4a7a9b;font-size:.6rem;margin-top:2px;">' + (tactic || '') + '</div>';
+  grid.appendChild(cell);
+}
+
+function applyMitreData(items) {
+  (items || []).forEach(function(item) {
+    if (item.technique_id) renderMitreCell(item.technique_id, item.tactic || '');
+  });
+}
+
+// ── PoCPreview ────────────────────────────────────────────────────────────
+function showPoC(poc) {
+  var empty = document.getElementById('poc-empty');
+  var content = document.getElementById('poc-content');
+  var urlEl = document.getElementById('poc-url');
+  var curlEl = document.getElementById('poc-curl');
+  if (!content) return;
+  if (empty) empty.style.display = 'none';
+  content.style.display = '';
+  if (urlEl) urlEl.textContent = poc.affected_url || poc.url || '—';
+  if (curlEl) curlEl.textContent = poc.curl_command || poc.curl || '—';
+}
+
+// ── AutonomousFeed ────────────────────────────────────────────────────────
+function addAutofeedEntry(d) {
+  var list = document.getElementById('autofeed-list');
+  var empty = document.getElementById('autofeed-empty');
+  if (!list) return;
+  if (empty) empty.remove();
+  var el = document.createElement('div');
+  el.className = 'autofeed-entry';
+  var tool = d.next_tool || d.tool || '';
+  var action = d.action || '';
+  var reason = d.reason || '';
+  var phase = d.phase || '';
+  var ts = d.timestamp ? d.timestamp.slice(11, 19) : '';
+  el.innerHTML =
+    (ts ? '<span style="color:#4a7a9b;margin-right:6px;">' + ts + '</span>' : '') +
+    '<span class="af-phase">[' + phase + ']</span>' +
+    (action ? '<span class="af-action">' + action + '</span>' : '') +
+    (tool ? '<span style="color:#00d4ff;margin-right:6px;">' + tool + '</span>' : '') +
+    (reason ? '<span class="af-reason">' + reason + '</span>' : '');
+  list.insertBefore(el, list.firstChild);
+}
+
+// ── KBViewer ──────────────────────────────────────────────────────────────
+var kbEntries = [];
+
+function renderKBTable(entries) {
+  var tbody = document.getElementById('kb-tbody');
+  var table = document.getElementById('kb-table');
+  var empty = document.getElementById('kb-empty');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  if (!entries || entries.length === 0) {
+    if (table) table.style.display = 'none';
+    if (empty) empty.style.display = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  if (table) table.style.display = '';
+  entries.forEach(function(e) {
+    var tr = document.createElement('tr');
+    var findingsCount = (e.findings || []).length;
+    var payloadsCount = (e.payloads || []).length;
+    var ts = (e.timestamp || '').slice(0, 19).replace('T', ' ');
+    tr.setAttribute('data-search', JSON.stringify(e).toLowerCase());
+    tr.innerHTML =
+      '<td style="color:var(--accent2);font-family:var(--font-mono);font-size:.72rem;">' + (e.target || '—') + '</td>' +
+      '<td style="color:var(--accent);font-size:.72rem;">' + findingsCount + '</td>' +
+      '<td style="color:#ffd700;font-size:.72rem;">' + payloadsCount + '</td>' +
+      '<td style="color:var(--muted);font-size:.68rem;">' + ts + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+window.filterKB = function() {
+  var q = (document.getElementById('kb-search').value || '').toLowerCase();
+  var rows = document.querySelectorAll('#kb-tbody tr');
+  rows.forEach(function(row) {
+    var haystack = row.getAttribute('data-search') || '';
+    row.style.display = (!q || haystack.indexOf(q) !== -1) ? '' : 'none';
+  });
+};
+
+function addKBEntry(entry) {
+  var existing = kbEntries.findIndex(function(e){ return e.target === entry.target; });
+  if (existing >= 0) kbEntries[existing] = entry;
+  else kbEntries.unshift(entry);
+  renderKBTable(kbEntries);
+}
+
+// ── SocketIO event subscriptions for v4 panels ───────────────────────────
+socket.on('finding_update', function(d) {
+  handleFindingUpdateForGraph(d);
+  if (d.technique_id) renderMitreCell(d.technique_id, d.tactic || '');
+});
+socket.on('poc_ready', function(d) { showPoC(d); });
+socket.on('autonomous_decision', function(d) { addAutofeedEntry(d); });
+socket.on('kb_update', function(d) { addKBEntry(d); });
+
+// ── Load initial data from API on page load ───────────────────────────────
+function loadV4InitialData() {
+  fetch('/api/attack-graph').then(function(r){ return r.ok ? r.json() : null; }).then(function(data) {
+    if (data) applyAttackGraphData(data);
+  }).catch(function(){});
+
+  fetch('/api/mitre-overlay').then(function(r){ return r.ok ? r.json() : null; }).then(function(data) {
+    if (data) applyMitreData(Array.isArray(data) ? data : (data.items || []));
+  }).catch(function(){});
+
+  fetch('/api/kb').then(function(r){ return r.ok ? r.json() : null; }).then(function(data) {
+    if (data) {
+      kbEntries = Array.isArray(data) ? data : (data.entries || []);
+      renderKBTable(kbEntries);
+    }
+  }).catch(function(){});
+
+  fetch('/api/autonomous-feed').then(function(r){ return r.ok ? r.json() : null; }).then(function(data) {
+    var items = Array.isArray(data) ? data : (data && data.decisions ? data.decisions : []);
+    items.slice().reverse().forEach(function(d){ addAutofeedEntry(d); });
+  }).catch(function(){});
+}
+
 // ── Reconnect / state replay ──────────────────────────────────────────────
 socket.on('disconnect', function(){
-  document.getElementById('nav-status').textContent = '● RECONNECTING';
-  document.getElementById('nav-status').style.color = 'var(--high)';
+  var navStatus = document.getElementById('nav-status');
+  if (navStatus) { navStatus.textContent = '● RECONNECTING'; navStatus.style.color = 'var(--high)'; }
   fetch('/api/state').then(function(r){return r.json();}).then(function(s){
-    var vulns = ((s.data||{}).vuln||{}).vulnerabilities||[];
+    var state = s.data || s;
+    // v3 replay
+    var vulns = (state.vuln||{}).vulnerabilities||[];
     vulns.forEach(function(v){ addFeedItem(v); });
+    // v4 replay
+    if (state.attack_graph) applyAttackGraphData(state.attack_graph);
+    if (state.mitre_overlay) applyMitreData(state.mitre_overlay);
+    if (state.poc_preview) showPoC(state.poc_preview);
+    if (state.autonomous_feed) (state.autonomous_feed.slice().reverse()).forEach(function(d){ addAutofeedEntry(d); });
+    if (state.kb_entries) { kbEntries = state.kb_entries; renderKBTable(kbEntries); }
   }).catch(function(){});
 });
 socket.on('connect', function(){
-  document.getElementById('nav-status').textContent = '● LIVE';
-  document.getElementById('nav-status').style.color = 'var(--accent)';
+  var navStatus = document.getElementById('nav-status');
+  if (navStatus) { navStatus.textContent = '● LIVE'; navStatus.style.color = 'var(--accent)'; }
 });
+
+// Init on load
+initAttackGraph();
+loadV4InitialData();
+
+
 
 // ── xterm.js terminal ─────────────────────────────────────────────────────
 if (typeof Terminal !== 'undefined') {

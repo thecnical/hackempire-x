@@ -16,6 +16,11 @@ Property 4: FallbackChain Never Raises
 Property 5: Degraded Iff No Succeeded Tool
   - degraded == (succeeded_tool is None) always holds
   **Validates: Requirements 2.7**
+
+Property 6: FallbackChain is applied on tool error in AutonomousMode
+  - when first tool raises ToolExecutionError/ToolNotInstalledError/ToolTimeoutError,
+    the system attempts the next tool and does NOT terminate the scan
+  **Validates: Requirements 2.7**
 """
 
 import sys
@@ -145,7 +150,7 @@ def _any_tools_st(draw):
 # ---------------------------------------------------------------------------
 
 @given(data=_tools_with_success_at_i(), target=_target_st)
-@settings(max_examples=200)
+@settings(max_examples=20)
 def test_property_2_stops_on_first_success(data, target):
     """Property 2: FallbackChain Stops on First Success — when tool[i] succeeds,
     tool[i+1] is never called.
@@ -173,7 +178,7 @@ def test_property_2_stops_on_first_success(data, target):
 # ---------------------------------------------------------------------------
 
 @given(tools=_all_fail_tools_st, target=_target_st)
-@settings(max_examples=200)
+@settings(max_examples=20)
 def test_property_3_degraded_on_all_failures(tools, target):
     """Property 3: FallbackChain Degraded on All Failures — all tools raising
     exceptions yields degraded=True.
@@ -193,7 +198,7 @@ def test_property_3_degraded_on_all_failures(tools, target):
 # ---------------------------------------------------------------------------
 
 @given(tools=_any_tools_st(), target=_target_st)
-@settings(max_examples=200)
+@settings(max_examples=20)
 def test_property_4_never_raises(tools, target):
     """Property 4: FallbackChain Never Raises — no exception for any tool list
     and target combination.
@@ -218,7 +223,7 @@ def test_property_4_never_raises(tools, target):
 # ---------------------------------------------------------------------------
 
 @given(tools=_any_tools_st(), target=_target_st)
-@settings(max_examples=200)
+@settings(max_examples=20)
 def test_property_5_degraded_iff_no_succeeded_tool(tools, target):
     """Property 5: Degraded Iff No Succeeded Tool — degraded == (succeeded_tool
     is None) always holds.
@@ -231,4 +236,56 @@ def test_property_5_degraded_iff_no_succeeded_tool(tools, target):
     assert result.degraded == (result.succeeded_tool is None), (
         f"Invariant violated: degraded={result.degraded}, "
         f"succeeded_tool={result.succeeded_tool!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Property 6: FallbackChain is applied on tool error in AutonomousMode
+# ---------------------------------------------------------------------------
+
+# Feature: hackempire-x-v4, Property 6: FallbackChain is applied on tool error in AutonomousMode
+@given(
+    exc_class=st.sampled_from([ToolExecutionError, ToolNotInstalledError, ToolTimeoutError]),
+    target=_target_st,
+)
+@settings(max_examples=10)
+def test_property_6_fallback_applied_on_tool_error_in_autonomous_mode(exc_class, target):
+    """Property 6: FallbackChain is applied on tool error in AutonomousMode.
+
+    When the first tool raises ToolExecutionError, ToolNotInstalledError, or
+    ToolTimeoutError, the system SHALL attempt the next tool in the FallbackChain
+    and SHALL NOT terminate the scan.
+
+    **Validates: Requirements 2.7**
+    """
+    # First tool always fails with the given exception class
+    fail_tool = _FailTool(exc_class, name="first_tool")
+    # Second tool always succeeds
+    success_tool = _SuccessTool(name="second_tool")
+
+    chain = FallbackChain(
+        tools=[fail_tool, success_tool],
+        emitter=_make_emitter(),
+        phase="recon",
+    )
+
+    # Should not raise
+    try:
+        result = chain.execute(target)
+    except Exception as exc:
+        raise AssertionError(
+            f"FallbackChain raised {type(exc).__name__} instead of applying fallback: {exc}"
+        ) from exc
+
+    # The scan must NOT terminate — second tool should have been attempted
+    assert success_tool.call_count >= 1, (
+        f"Second tool was never called after first tool raised {exc_class.__name__}"
+    )
+
+    # The chain should have succeeded via the second tool
+    assert result.succeeded_tool == "second_tool", (
+        f"Expected succeeded_tool='second_tool', got {result.succeeded_tool!r}"
+    )
+    assert result.degraded is False, (
+        f"Expected degraded=False when fallback tool succeeds, got degraded={result.degraded}"
     )

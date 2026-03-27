@@ -309,6 +309,7 @@ def cmd_scan(
     web: bool = False,
     proxy: Optional[str] = None,
     resume: bool = False,
+    autonomous: bool = False,
 ) -> int:
     """
     Run a scan against *target*.
@@ -361,6 +362,7 @@ def cmd_scan(
         return _run_v2_scan(
             console=console, logger=logger, target=target,
             mode="ultra", ai_key=ai_key, web=True, proxy=proxy,
+            autonomous=True,
         )
 
     # ------------------------------------------------------------------
@@ -426,6 +428,7 @@ def cmd_scan(
             ai_key=ai_key,
             web=web,
             proxy=proxy,
+            autonomous=autonomous,
         )
 
     # ------------------------------------------------------------------
@@ -453,6 +456,7 @@ def _run_v2_scan(
     ai_key: Optional[str],
     web: bool,
     proxy: Optional[str],
+    autonomous: bool = False,
 ) -> int:
     """Instantiate OrchestratorV2 with all subsystems and run the full 7-phase scan."""
     from core.config import Config
@@ -476,19 +480,19 @@ def _run_v2_scan(
         web = True         # always start dashboard in ultra
 
     try:
-        config = Config(
+        config = Config.create(
             target=target,
             mode=mode,
             ai_key=ai_key,
             web_enabled=web,
             proxy=proxy,
+            autonomous=(mode == "ultra" or autonomous),
         )
     except Exception as exc:
         logger.error("Failed to prepare configuration", exc=exc)
         return 1
 
-    # ── Load AI keys from config ──────────────────────────────────────────
-    ai_engine = None
+    # ── Load AI keys from config ──────────────────────────────────────────    ai_engine = None
     try:
         from ai.ai_engine import AIEngine
         saved = _load_config()

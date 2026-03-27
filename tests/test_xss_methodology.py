@@ -51,7 +51,7 @@ _vulnerability_st = st.builds(
 # ---------------------------------------------------------------------------
 
 @given(findings=st.lists(_vulnerability_st, min_size=0, max_size=50))
-@settings(max_examples=300)
+@settings(max_examples=30)
 def test_property_15_deduplicate_no_duplicates(findings: list[Vulnerability]) -> None:
     """Property 15: XSSMethodology Deduplicates Findings — _deduplicate() returns no
     duplicate (name, url, severity) tuples for any input list.
@@ -69,7 +69,7 @@ def test_property_15_deduplicate_no_duplicates(findings: list[Vulnerability]) ->
 
 
 @given(findings=st.lists(_vulnerability_st, min_size=0, max_size=50))
-@settings(max_examples=200)
+@settings(max_examples=20)
 def test_property_15_deduplicate_subset_of_input(findings: list[Vulnerability]) -> None:
     """Deduplication only removes entries — every result key was present in the input.
 

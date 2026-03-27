@@ -59,6 +59,34 @@ from tools.vuln.sqlmap_tool import SqlmapTool
 from tools.post_exploit.linpeas_tool import LinpeasTool
 from tools.post_exploit.crackmapexec_tool import CrackMapExecTool
 
+# --- v4.4 new recon tools ---
+from tools.recon.theharvester_tool import TheHarvesterTool
+from tools.recon.reconng_tool import ReconNgTool
+from tools.recon.dnsenum_tool import DnsEnumTool
+from tools.recon.fierce_tool import FierceTool
+
+# --- v4.4 new enum tools ---
+from tools.enum.wpprobe_tool import WPProbeTool
+from tools.enum.wpscan_tool import WPScanTool
+from tools.enum.joomscan_tool import JoomscanTool
+
+# --- v4.4 new vuln tools ---
+from tools.vuln.sstimap_tool import SSTImapTool
+from tools.vuln.zapproxy_tool import ZAPProxyTool
+from tools.vuln.semgrep_tool import SemgrepTool
+
+# --- v4.4 new external/exploitation tools ---
+from tools.external.metasploit_mcp_tool import MetasploitMCPTool
+from tools.external.ysoserial_tool import YsoserialTool
+from tools.external.certipy_tool import CertipyTool
+
+# --- v4.4 new post_exploit tools ---
+from tools.post_exploit.adaptixc2_tool import AdaptixC2Tool
+from tools.post_exploit.atomic_operator_tool import AtomicOperatorTool
+from tools.post_exploit.pypykatz_tool import PypykatzTool
+from tools.post_exploit.pspy_tool import PspyTool
+from tools.post_exploit.evilwinrm_tool import EvilWinRMTool
+
 
 # ---------------------------------------------------------------------------
 # PHASE_TOOLS_2025 — 7 phases × 6 tools each
@@ -95,12 +123,12 @@ class ToolManager:
         Phase.ENUM.value: [DirsearchTool, FFUFTool],
         Phase.VULN.value: [NucleiTool],
         # New 2025 phase keys
-        "recon":         [SubfinderTool, HttpxTool, DnsxTool],
+        "recon":         [SubfinderTool, HttpxTool, DnsxTool, TheHarvesterTool, ReconNgTool, DnsEnumTool, FierceTool],
         "url_discovery": [KatanaTool, GauTool],
-        "enumeration":   [FeroxbusterTool, FFUFTool, DirsearchTool, ArjunTool],
-        "vuln_scan":     [NucleiTool, NiktoTool, DalfoxTool, GhauriTool],
-        "exploitation":  [SqlmapTool],
-        "post_exploit":  [LinpeasTool, CrackMapExecTool],
+        "enumeration":   [FeroxbusterTool, FFUFTool, DirsearchTool, ArjunTool, WPProbeTool, WPScanTool, JoomscanTool],
+        "vuln_scan":     [NucleiTool, NiktoTool, DalfoxTool, GhauriTool, SSTImapTool, ZAPProxyTool, SemgrepTool],
+        "exploitation":  [SqlmapTool, MetasploitMCPTool, YsoserialTool, CertipyTool],
+        "post_exploit":  [LinpeasTool, CrackMapExecTool, AdaptixC2Tool, AtomicOperatorTool, PypykatzTool, PspyTool, EvilWinRMTool],
         "reporting":     [],
     }
 

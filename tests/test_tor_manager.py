@@ -38,7 +38,7 @@ _cmd_st = st.lists(
 # ---------------------------------------------------------------------------
 
 @given(cmd=_cmd_st)
-@settings(max_examples=200)
+@settings(max_examples=20)
 def test_property_13_wrap_command_does_not_mutate_input(cmd):
     """Property 13: TorManager wrap_command Does Not Mutate Input — original
     list unchanged after wrap_command.

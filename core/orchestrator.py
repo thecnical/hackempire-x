@@ -418,7 +418,22 @@ class OrchestratorV2:
             mode=self._config.mode,
             session_id=session_id,
             started_at=started_at,
+            autonomous=getattr(self._config, "autonomous", False),
         )
+
+        # v4.3 — Query RAG KB for prior findings before generating todo
+        kb_manager = None
+        try:
+            from hackempire.core.kb_manager import KnowledgeBaseManager  # noqa: PLC0415
+            kb_manager = KnowledgeBaseManager()
+            prior_entries = kb_manager.search(target)
+            if prior_entries:
+                context.kb_entries = prior_entries
+                self._logger.info(
+                    f"[OrchestratorV2] RAG KB: found {len(prior_entries)} prior entries for {target}"
+                )
+        except Exception as exc:  # noqa: BLE001
+            self._logger.warning(f"[OrchestratorV2] RAG KB query failed: {exc}")
 
         # Step 1: Generate todo list via AIEngine (or empty fallback)
         todo = self._generate_todo(target, context)
@@ -435,6 +450,16 @@ class OrchestratorV2:
         if self._config.mode == "stealth":
             self._start_tor()
 
+        # v4.2 — Initialize AutonomousEngine if autonomous mode is active
+        autonomous_engine = None
+        if getattr(self._config, "autonomous", False) and self._ai_engine is not None:
+            try:
+                from hackempire.ai.autonomous_engine import AutonomousEngine  # noqa: PLC0415
+                autonomous_engine = AutonomousEngine(ai_engine=self._ai_engine)
+                self._logger.info("[OrchestratorV2] Autonomous mode active")
+            except Exception as exc:  # noqa: BLE001
+                self._logger.warning(f"[OrchestratorV2] AutonomousEngine init failed: {exc}")
+
         # Step 4: Run all 7 phases via PhaseManager
         if self._phase_manager is not None:
             self._run_phases(self._phase_manager, target, context)
@@ -443,6 +468,31 @@ class OrchestratorV2:
 
         # Step 5: Emit scan_complete with final report
         final_report = self._build_final_report(context)
+
+        # v4.3 — Write scan results to RAG KB
+        if kb_manager is not None:
+            try:
+                from hackempire.core.models import KBEntry  # noqa: PLC0415
+                from hackempire.core.phases import Phase  # noqa: PLC0415
+                from datetime import datetime as _dt, timezone as _tz  # noqa: PLC0415
+                vuln_data = context.phase_results.get(Phase.VULN_SCAN.value, {})
+                vulns = vuln_data.get("vulnerabilities", []) if isinstance(vuln_data, dict) else []
+                findings = []
+                for v in vulns:
+                    if hasattr(v, "name"):
+                        findings.append({"name": v.name, "url": v.url, "severity": v.severity})
+                    elif isinstance(v, dict):
+                        findings.append(v)
+                kb_entry = KBEntry(
+                    target=target,
+                    findings=findings,
+                    payloads=[],
+                    attack_patterns=[],
+                    timestamp=_dt.now(_tz.utc).isoformat(),
+                )
+                kb_manager.write(kb_entry)
+            except Exception as exc:  # noqa: BLE001
+                self._logger.warning(f"[OrchestratorV2] RAG KB write failed: {exc}")
         if self._emitter is not None:
             try:
                 self._emitter.emit_scan_complete(final_report)
@@ -491,6 +541,16 @@ class OrchestratorV2:
         """Run all 7 phases in order, applying post-phase hooks after each."""
         from hackempire.core.phases import Phase  # noqa: PLC0415
 
+        # v4.2 — Initialize AutonomousEngine if autonomous mode is active
+        autonomous_engine = None
+        if getattr(context, "autonomous", False) and self._ai_engine is not None:
+            try:
+                from hackempire.ai.autonomous_engine import AutonomousEngine  # noqa: PLC0415
+                autonomous_engine = AutonomousEngine(ai_engine=self._ai_engine)
+                self._logger.info("[OrchestratorV2] Autonomous mode active — AutonomousEngine initialized")
+            except Exception as exc:  # noqa: BLE001
+                self._logger.warning(f"[OrchestratorV2] AutonomousEngine init failed: {exc}")
+
         for phase in phase_manager.PHASES:
             # Gate exploitation phase behind --mode=exploit
             # Satisfies Requirement 18.3: exploitation-phase tools are disabled when mode != "exploit"
@@ -508,7 +568,16 @@ class OrchestratorV2:
 
             # Run the phase (PhaseManager.run_phase never raises)
             try:
-                phase_result = phase_manager.run_phase(phase, target, context)
+                if autonomous_engine is not None:
+                    phase_result = autonomous_engine.run_phase_loop(
+                        phase=phase,
+                        target=target,
+                        context=context,
+                        phase_manager=phase_manager,
+                        emitter=self._emitter,
+                    )
+                else:
+                    phase_result = phase_manager.run_phase(phase, target, context)
             except Exception as exc:  # noqa: BLE001
                 self._logger.error(
                     f"[OrchestratorV2] Phase '{phase.value}' raised unexpectedly: {exc}"
@@ -535,24 +604,51 @@ class OrchestratorV2:
                         f"[OrchestratorV2] AI analysis failed for phase '{phase.value}': {exc}"
                     )
 
-            # After VULN_SCAN: run false positive filter
-            if phase is Phase.VULN_SCAN and self._ai_engine is not None:
-                try:
-                    raw_vulns = context.phase_results.get(phase.value, {})
-                    if isinstance(raw_vulns, dict):
-                        vulns_list = raw_vulns.get("vulnerabilities", [])
-                        if vulns_list:
-                            filtered = self._ai_engine.filter_false_positives(vulns_list)
-                            filtered_count = len(vulns_list) - len(filtered)
-                            if filtered_count > 0:
-                                self._logger.info(
-                                    f"[OrchestratorV2] FP filter: removed {filtered_count} "
-                                    f"false positives from {len(vulns_list)} findings"
-                                )
-                            raw_vulns["vulnerabilities"] = filtered
-                            raw_vulns["fp_filtered_count"] = filtered_count
-                except Exception as exc:  # noqa: BLE001
-                    self._logger.warning(f"[OrchestratorV2] FP filter failed: {exc}")
+            # After VULN_SCAN: run false positive filter + emit finding_update events
+            if phase is Phase.VULN_SCAN:
+                if self._ai_engine is not None:
+                    try:
+                        raw_vulns = context.phase_results.get(phase.value, {})
+                        if isinstance(raw_vulns, dict):
+                            vulns_list = raw_vulns.get("vulnerabilities", [])
+                            if vulns_list:
+                                filtered = self._ai_engine.filter_false_positives(vulns_list)
+                                filtered_count = len(vulns_list) - len(filtered)
+                                if filtered_count > 0:
+                                    self._logger.info(
+                                        f"[OrchestratorV2] FP filter: removed {filtered_count} "
+                                        f"false positives from {len(vulns_list)} findings"
+                                    )
+                                raw_vulns["vulnerabilities"] = filtered
+                                raw_vulns["fp_filtered_count"] = filtered_count
+                    except Exception as exc:  # noqa: BLE001
+                        self._logger.warning(f"[OrchestratorV2] FP filter failed: {exc}")
+
+                # Emit finding_update for each confirmed vulnerability (v4.6)
+                if self._emitter is not None:
+                    try:
+                        from hackempire.ai.mitre_mapper import map_finding  # noqa: PLC0415
+                        raw_vulns = context.phase_results.get(phase.value, {})
+                        vulns_list = raw_vulns.get("vulnerabilities", []) if isinstance(raw_vulns, dict) else []
+                        for vuln in vulns_list:
+                            try:
+                                name = vuln.name if hasattr(vuln, "name") else str(vuln.get("name", ""))
+                                host = vuln.target if hasattr(vuln, "target") else str(vuln.get("target", target))
+                                url = vuln.url if hasattr(vuln, "url") else str(vuln.get("url", ""))
+                                mitre = map_finding(name)
+                                finding_payload = {
+                                    "host": host,
+                                    "service": url,
+                                    "exploit_path": url,
+                                    "technique_id": mitre["technique_id"],
+                                    "tactic": mitre["tactic"],
+                                    "name": name,
+                                }
+                                self._emitter.emit_finding_update(finding_payload)
+                            except Exception:  # noqa: BLE001
+                                pass
+                    except Exception as exc:  # noqa: BLE001
+                        self._logger.warning(f"[OrchestratorV2] emit_finding_update failed: {exc}")
 
             # After REPORTING phase: auto-generate PoC + H1 reports
             if phase is Phase.REPORTING and self._ai_engine is not None:

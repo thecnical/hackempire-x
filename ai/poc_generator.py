@@ -281,8 +281,9 @@ class PoCGenerator:
         pocs = gen.generate(vulns)
     """
 
-    def __init__(self, ai_engine: Any = None) -> None:
+    def __init__(self, ai_engine: Any = None, emitter: Any = None) -> None:
         self._ai = ai_engine
+        self._emitter = emitter
 
     def generate(self, vulns: list[Vulnerability]) -> list[ProofOfConcept]:
         """Generate PoC for each vulnerability. Never raises."""
@@ -291,13 +292,36 @@ class PoCGenerator:
             try:
                 poc = self._generate_one(vuln)
                 pocs.append(poc)
+                # v4.6 — emit poc_ready event for Dashboard PoCPreview panel
+                if self._emitter is not None:
+                    try:
+                        self._emitter.emit_poc_ready({
+                            "curl_command": poc.curl_command,
+                            "affected_url": poc.url,
+                            "vuln_name": poc.vuln_name,
+                            "payload": poc.payload,
+                        })
+                    except Exception:  # noqa: BLE001
+                        pass
             except Exception as exc:
                 logger.warning(f"[poc_gen] Failed for {vuln.name}: {exc}")
         return pocs
 
     def generate_one(self, vuln: Vulnerability) -> ProofOfConcept:
         """Generate PoC for a single vulnerability."""
-        return self._generate_one(vuln)
+        poc = self._generate_one(vuln)
+        # v4.6 — emit poc_ready event for Dashboard PoCPreview panel
+        if self._emitter is not None:
+            try:
+                self._emitter.emit_poc_ready({
+                    "curl_command": poc.curl_command,
+                    "affected_url": poc.url,
+                    "vuln_name": poc.vuln_name,
+                    "payload": poc.payload,
+                })
+            except Exception:  # noqa: BLE001
+                pass
+        return poc
 
     # ── Internal ─────────────────────────────────────────────────────────
 

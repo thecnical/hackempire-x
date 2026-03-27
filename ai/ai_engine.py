@@ -179,32 +179,60 @@ class AIEngine(AIClient):
         _openrouter_key = openrouter_key or api_key
         super().__init__(api_key=_openrouter_key, base_url=base_url, model=model)
 
+        # v4.1 — ModelChain: 5 free Bytez models in priority order
+        self._model_chain: "ModelChain | None" = None
+        if bytez_key:
+            try:
+                from hackempire.ai.model_chain import ModelChain
+                self._model_chain = ModelChain(api_key=bytez_key)
+                logger.info("[ai_engine] ModelChain ready with %d Bytez models",
+                            len(self._model_chain.models))
+            except Exception as exc:
+                logger.warning("[ai_engine] ModelChain init failed: %s", exc)
+
+        # Keep BytezClient for backward compat (single-model path)
         self._bytez_client: BytezClient | None = (
-            BytezClient(api_key=bytez_key) if bytez_key else None
+            BytezClient(api_key=bytez_key) if bytez_key and self._model_chain is None else None
         )
         self._openrouter_available = bool(_openrouter_key)
         self._knowledge_base = knowledge_base if knowledge_base is not None else PentestKnowledgeBase()
 
     def _send(self, prompt: str) -> dict:
         """
-        Send prompt using provider priority:
-        1. Bytez AI (if key configured)
+        Send prompt using provider priority (v4.1):
+        1. ModelChain — 5 Bytez free models in order (Qwen → Mistral → Gemma → gpt-4o-mini → gpt-4.1-mini)
         2. OpenRouter (if key configured)
         3. Return empty response (triggers KB fallback)
+        Never raises.
         """
-        # Try Bytez first
-        if self._bytez_client is not None:
+        # Sanitize prompt before sending to any provider
+        sanitized = _sanitize_context_for_prompt({"prompt": prompt})
+
+        # Try ModelChain (5 Bytez free models)
+        if self._model_chain is not None:
+            from hackempire.core.models import ModelResult  # noqa: PLC0415
+            result = self._model_chain.send(prompt)
+            if result.provider == "bytez" and result.raw_text:
+                logger.debug("[ai_engine] ModelChain succeeded: model=%s", result.model_name)
+                return {"raw_text": result.raw_text, "status_code": result.status_code,
+                        "model_name": result.model_name, "provider": "bytez"}
+            logger.warning("[ai_engine] ModelChain exhausted, trying OpenRouter...")
+
+        # Fallback: single BytezClient (backward compat, only if ModelChain not available)
+        elif self._bytez_client is not None:
             resp = self._bytez_client.send_request(prompt)
             if resp.get("status_code") == 200 and resp.get("raw_text"):
                 return resp
-            logger.warning("Bytez AI unavailable (status=%s), trying OpenRouter...", resp.get("status_code"))
+            logger.warning("[ai_engine] BytezClient unavailable (status=%s), trying OpenRouter...",
+                           resp.get("status_code"))
 
         # Try OpenRouter
         if self._openrouter_available:
             resp = self.send_request(prompt)
             if resp.get("status_code") == 200 and resp.get("raw_text"):
                 return resp
-            logger.warning("OpenRouter unavailable (status=%s), using KB fallback.", resp.get("status_code"))
+            logger.warning("[ai_engine] OpenRouter unavailable (status=%s), using KB fallback.",
+                           resp.get("status_code"))
 
         return {"raw_text": "", "status_code": 0}
 

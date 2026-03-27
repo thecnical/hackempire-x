@@ -81,6 +81,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Resume a previous scan",
     )
+    scan_parser.add_argument(
+        "--autonomous",
+        action="store_true",
+        default=False,
+        help="Enable autonomous AI mode (AI decides tools and phase transitions)",
+    )
 
     # ------------------------------------------------------------------
     # report subcommand
@@ -221,6 +227,7 @@ def run_cli(argv: Optional[list[str]] = None) -> int:
             web=args.web,
             proxy=args.proxy,
             resume=args.resume,
+            autonomous=getattr(args, "autonomous", False),
         )
 
     if args.subcommand == "report":
