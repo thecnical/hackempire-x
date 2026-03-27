@@ -68,9 +68,9 @@ def _build_parser() -> argparse.ArgumentParser:
     scan_parser.add_argument("target", help="Target domain or IP address")
     scan_parser.add_argument(
         "--mode",
-        choices=["recon-only", "full", "exploit", "stealth"],
+        choices=["recon-only", "full", "exploit", "stealth", "ultra"],
         default="full",
-        help="Scan mode (default: full)",
+        help="Scan mode (default: full). ultra = full+stealth+exploit+auto-report",
     )
     scan_parser.add_argument("--ai-key", dest="ai_key", default=None)
     scan_parser.add_argument("--web", action="store_true", default=False)

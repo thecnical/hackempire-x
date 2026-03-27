@@ -180,7 +180,35 @@ for tool_bin in arjun waymore sslyze nxc bloodhound-python impacket-secretsdump 
   done
 done
 
-# ── 7. Launcher script ───────────────────────────────────────────────────────
+# ── 7. Wrapper scripts for git tools (so they appear on PATH) ───────────────
+section "Tool wrappers"
+create_wrapper() {
+  local name=$1 script=$2
+  local wrapper="/usr/local/bin/$name"
+  if command -v "$name" &>/dev/null; then ok "$name already on PATH"; return; fi
+  if [ ! -f "$script" ]; then warn "$script not found — skipping wrapper"; return; fi
+  sudo tee "$wrapper" > /dev/null << WRAPPER
+#!/usr/bin/env bash
+exec python3 "$script" "\$@"
+WRAPPER
+  sudo chmod +x "$wrapper"
+  ok "Wrapper created: $name → $script"
+}
+
+create_wrapper dirsearch  /opt/dirsearch/dirsearch.py
+create_wrapper xsstrike   /opt/xsstrike/xsstrike.py
+create_wrapper tplmap     /opt/tplmap/tplmap.py
+create_wrapper ghauri     /opt/ghauri/ghauri.py
+create_wrapper paramspider /opt/paramspider/paramspider.py
+
+# testssl.sh wrapper
+if [ -f /opt/testssl/testssl.sh ] && ! command -v testssl &>/dev/null; then
+  sudo ln -sf /opt/testssl/testssl.sh /usr/local/bin/testssl
+  sudo chmod +x /usr/local/bin/testssl
+  ok "testssl linked"
+fi
+
+# ── 8. Launcher script ───────────────────────────────────────────────────────
 section "Launcher"
 LAUNCHER="$SCRIPT_DIR/hackempire"
 cat > "$LAUNCHER" << 'LAUNCHER_EOF'
@@ -204,7 +232,9 @@ echo -e "${GREEN}╚════════════════════
 echo ""
 echo -e "${CYAN}  USAGE:${NC}"
 echo -e "  ${YELLOW}./hackempire scan example.com --mode full${NC}"
+echo -e "  ${YELLOW}./hackempire scan example.com --mode ultra --web${NC}  ← SINGLE COMMAND FULL POWER"
 echo -e "  ${YELLOW}./hackempire scan example.com --mode stealth --web${NC}"
 echo -e "  ${YELLOW}./hackempire --doctor${NC}   ← fix missing tools"
 echo -e "  ${YELLOW}./hackempire --status${NC}   ← check tool health"
+echo -e "  ${YELLOW}./hackempire config bytez_key YOUR_KEY${NC}   ← set AI key"
 echo ""

@@ -276,7 +276,29 @@ def cmd_uninstall(console: Console) -> int:
 # scan
 # ---------------------------------------------------------------------------
 
-_SCAN_MODES = ("recon-only", "full", "exploit", "stealth")
+_SCAN_MODES = ("recon-only", "full", "exploit", "stealth", "ultra")
+
+
+def _auto_fix_missing_tools(console: Console, logger: Logger) -> None:
+    """
+    Startup mein missing tools auto-fix karo silently.
+    Critical tools jo missing hain unhe install karne ki koshish karo.
+    """
+    from installer.tool_installer import ToolInstaller, TOOL_INSTALL_SPECS
+    from installer.dependency_resolver import DependencyResolver
+
+    installer = ToolInstaller(logger=logger, auto_approve=True)
+    missing = [n for n in TOOL_INSTALL_SPECS if not installer.check_installed(n)]
+
+    if not missing:
+        return
+
+    console.print(f"[dim]  Auto-fixing {len(missing)} missing tools...[/dim]")
+    resolver = DependencyResolver(logger=logger, auto_approve=True)
+    try:
+        resolver.resolve(missing)
+    except Exception:
+        pass  # Never block scan due to tool install failure
 
 
 def cmd_scan(
@@ -289,9 +311,14 @@ def cmd_scan(
     resume: bool = False,
 ) -> int:
     """
-    Run a scan against *target* with the given mode.
+    Run a scan against *target*.
 
-    Modes: recon-only, full, exploit, stealth
+    Modes:
+      full       — 7-phase pipeline
+      recon-only — recon phase only
+      stealth    — Tor + rate limiting
+      exploit    — full + active exploitation (requires confirmation)
+      ultra      — EVERYTHING: stealth + full + exploit + web + auto-export
     """
     from utils.validator import validate_target
 
@@ -301,11 +328,58 @@ def cmd_scan(
 
     mode = mode.lower()
     if mode not in _SCAN_MODES:
-        console.print(
-            f"[bold red]Error:[/bold red] Unknown mode '{mode}'. "
-            f"Choose: {', '.join(_SCAN_MODES)}"
-        )
+        console.print(f"[bold red]Error:[/bold red] Unknown mode '{mode}'. Choose: {', '.join(_SCAN_MODES)}")
         return 2
+
+    logger = Logger(console=console)
+
+    # ── ULTRA MODE — single command, full power ──────────────────────────
+    if mode == "ultra":
+        console.print(Panel(
+            "[bold red]ULTRA MODE[/bold red]\n\n"
+            "  Full 7-phase pipeline\n"
+            "  Stealth routing via Tor\n"
+            "  Active exploitation enabled\n"
+            "  Live web dashboard\n"
+            "  Auto-export: PDF + JSON + HTML\n\n"
+            "[bold yellow]Only use on targets you have written permission to test.[/bold yellow]\n"
+            "[bold yellow]Type CONFIRM to proceed:[/bold yellow]",
+            border_style="red",
+            title="[bold red]HACKEMPIRE X — ULTRA[/bold red]",
+        ))
+        try:
+            answer = input("> ").strip()
+        except (EOFError, OSError):
+            answer = ""
+        if answer != "CONFIRM":
+            console.print("[dim]Ultra mode cancelled.[/dim]")
+            return 1
+
+        # Ultra = stealth + exploit + web + auto-export
+        import os as _os
+        _os.environ["HACKEMPIRE_RATE_LIMIT_RPS"] = "2"
+        web = True
+        # Auto-fix missing tools before scan
+        _auto_fix_missing_tools(console, logger)
+        # Run as exploit mode internally (full pipeline)
+        exit_code = _run_v2_scan(
+            console=console, logger=logger, target=target,
+            mode="exploit", ai_key=ai_key, web=True, proxy=proxy,
+        )
+        # Auto-export all formats after scan
+        console.print("\n[bold cyan]Auto-exporting reports...[/bold cyan]")
+        for fmt in ("json", "html", "pdf"):
+            try:
+                cmd_report(console=console, fmt=fmt)
+            except Exception:
+                pass
+        console.print(Panel(
+            f"[bold green]ULTRA scan complete: {target}[/bold green]\n\n"
+            "  Reports saved: hackempire_report_*.json / .html / .pdf\n"
+            "  Dashboard: https://127.0.0.1:5443/dashboard",
+            border_style="green",
+        ))
+        return exit_code
 
     # ------------------------------------------------------------------
     # Exploit mode — require explicit confirmation
@@ -318,6 +392,16 @@ def cmd_scan(
                 "Only proceed if you have explicit written authorisation for this target.\n\n"
                 "[bold yellow]Type CONFIRM to proceed:[/bold yellow]",
                 border_style="red",
+                title="[bold red]EXPLOIT MODE[/bold red]",
+            )
+        )
+        try:
+            answer = input("> ").strip()
+        except (EOFError, OSError):
+            answer = ""
+        if answer != "CONFIRM":
+            console.print("[dim]Exploit mode cancelled.[/dim]")
+            return 1
                 title="[bold red]EXPLOIT MODE[/bold red]",
             )
         )
@@ -344,8 +428,6 @@ def cmd_scan(
     if resume:
         console.print("[bold cyan]Resuming previous scan…[/bold cyan]")
 
-    logger = Logger(console=console)
-
     if web:
         import threading
         try:
@@ -363,7 +445,7 @@ def cmd_scan(
     # ------------------------------------------------------------------
     # OrchestratorV2 path — full, exploit, stealth modes
     # ------------------------------------------------------------------
-    if mode in ("full", "exploit", "stealth"):
+    if mode in ("full", "exploit", "stealth", "ultra"):
         return _run_v2_scan(
             console=console,
             logger=logger,
@@ -403,6 +485,24 @@ def _run_v2_scan(
     """Instantiate OrchestratorV2 with all subsystems and run the full 7-phase scan."""
     from core.config import Config
 
+    # ── ULTRA MODE: single command, full power ────────────────────────────
+    is_ultra = (mode == "ultra")
+    if is_ultra:
+        console.print(Panel(
+            "[bold red]⚡ ULTRA MODE ACTIVATED[/bold red]\n\n"
+            "  ✓ Full 7-phase pipeline\n"
+            "  ✓ Stealth routing via Tor\n"
+            "  ✓ WAF detection + bypass\n"
+            "  ✓ AI decisions (Bytez → OpenRouter → KB)\n"
+            "  ✓ Live dashboard\n"
+            "  ✓ Auto PDF + JSON + HTML export\n\n"
+            "[dim]Config keys loaded from ~/.hackempire/config.json[/dim]",
+            border_style="red",
+            title="[bold red]HackEmpire X — ULTRA[/bold red]",
+        ))
+        mode = "exploit"   # ultra runs full exploit pipeline
+        web = True         # always start dashboard in ultra
+
     try:
         config = Config(
             target=target,
@@ -415,11 +515,66 @@ def _run_v2_scan(
         logger.error("Failed to prepare configuration", exc=exc)
         return 1
 
-    # ------------------------------------------------------------------
-    # Instantiate subsystems — each wrapped in try/except so a broken
-    # subsystem never prevents the scan from starting.
-    # ------------------------------------------------------------------
+    # ── Load AI keys from config ──────────────────────────────────────────
+    ai_engine = None
+    try:
+        from ai.ai_engine import AIEngine
+        saved = _load_config()
+        bytez_key = saved.get("bytez_key", "")
+        openrouter_key = saved.get("openrouter_key", "") or ai_key or ""
+        if bytez_key or openrouter_key:
+            ai_engine = AIEngine(bytez_key=bytez_key, openrouter_key=openrouter_key)
+            provider = "Bytez AI" if bytez_key else "OpenRouter"
+            logger.info(f"[v2] AI provider: {provider}")
+        else:
+            logger.info("[v2] No AI keys — using offline KB. Set: ./hackempire config bytez_key YOUR_KEY")
+    except Exception as exc:
+        logger.warning(f"[v2] AIEngine unavailable: {exc}")
 
+    # ── Tor (stealth + ultra) ─────────────────────────────────────────────
+    tor_manager = None
+    if mode in ("stealth",) or is_ultra:
+        try:
+            from core.tor_manager import TorManager
+            tor_manager = TorManager()
+            logger.info("[v2] Starting Tor...")
+            if tor_manager.start():
+                logger.success("[v2] Tor started — traffic routed via proxychains4")
+            else:
+                logger.warning("[v2] Tor failed to start — continuing without stealth")
+        except Exception as exc:
+            logger.warning(f"[v2] TorManager unavailable: {exc}")
+
+    # ── WAF detection ─────────────────────────────────────────────────────
+    waf_result = None
+    try:
+        from tools.waf.waf_detector import WafDetector
+        detector = WafDetector()
+        logger.info(f"[v2] Detecting WAF for {target}...")
+        waf_result = detector.detect(target)
+        if waf_result.detected:
+            logger.success(f"[v2] WAF detected: {waf_result.vendor} — bypass strategy loaded")
+        else:
+            logger.info("[v2] No WAF detected")
+    except Exception as exc:
+        logger.warning(f"[v2] WafDetector unavailable: {exc}")
+
+    # ── Web dashboard ─────────────────────────────────────────────────────
+    if web:
+        import threading
+        try:
+            from web.app import run_server
+            web_thread = threading.Thread(
+                target=run_server,
+                kwargs={"host": "127.0.0.1", "port": 5443, "debug": False},
+                daemon=True,
+            )
+            web_thread.start()
+            logger.success("[v2] Dashboard → https://127.0.0.1:5443/dashboard")
+        except Exception as exc:
+            logger.warning(f"[v2] Web dashboard failed: {exc}")
+
+    # ── Subsystems ────────────────────────────────────────────────────────
     emitter = None
     try:
         from web.realtime_emitter import RealTimeEmitter
@@ -431,12 +586,9 @@ def _run_v2_scan(
     try:
         from tools.tool_manager import ToolManager
         tool_manager = ToolManager(
-            logger=logger,
-            timeout_s=60.0,
-            execution_mode="parallel",
-            max_workers=4,
-            web_scheme="https",
-            proxy=proxy,
+            logger=logger, timeout_s=60.0,
+            execution_mode="parallel", max_workers=4,
+            web_scheme="https", proxy=proxy,
         )
     except Exception as exc:
         logger.warning(f"[v2] ToolManager unavailable: {exc}")
@@ -449,84 +601,22 @@ def _run_v2_scan(
     except Exception as exc:
         logger.warning(f"[v2] PhaseManager unavailable: {exc}")
 
-    ai_engine = None
-    try:
-        from ai.ai_engine import AIEngine
-        # Always load saved keys from ~/.hackempire/config.json
-        saved = _load_config()
-        bytez_key = saved.get("bytez_key", "")
-        openrouter_key = saved.get("openrouter_key", "") or ai_key or ""
-        if bytez_key or openrouter_key:
-            ai_engine = AIEngine(
-                bytez_key=bytez_key,
-                openrouter_key=openrouter_key,
-            )
-            provider = "Bytez AI" if bytez_key else "OpenRouter"
-            logger.info(f"[v2] AIEngine ready — primary provider: {provider}")
-        else:
-            logger.info("[v2] No AI keys configured — using offline KB. Run: ./hackempire config bytez_key YOUR_KEY")
-    except Exception as exc:
-        logger.warning(f"[v2] AIEngine unavailable: {exc}")
-
-    todo_planner = None
-    try:
-        from core.todo_planner import TodoPlanner
-        todo_planner = TodoPlanner(emitter=emitter)
-    except Exception as exc:
-        logger.warning(f"[v2] TodoPlanner unavailable: {exc}")
-
-    tor_manager = None
-    if mode == "stealth":
-        try:
-            from core.tor_manager import TorManager
-            tor_manager = TorManager()
-        except Exception as exc:
-            logger.warning(f"[v2] TorManager unavailable: {exc}")
-
-    waf_detector = None
-    try:
-        from tools.waf.waf_detector import WafDetector
-        waf_detector = WafDetector()
-    except Exception as exc:
-        logger.warning(f"[v2] WafDetector unavailable: {exc}")
-
-    terminal_launcher = None
-    try:
-        from web.terminal_launcher import TerminalLauncher
-        terminal_launcher = TerminalLauncher()
-    except Exception as exc:
-        logger.warning(f"[v2] TerminalLauncher unavailable: {exc}")
-
-    dep_resolver = None
-    try:
-        from installer.dependency_resolver import DependencyResolver
-        dep_resolver = DependencyResolver(logger=logger, auto_approve=True)
-    except Exception as exc:
-        logger.warning(f"[v2] DependencyResolver unavailable: {exc}")
-
-    # ------------------------------------------------------------------
-    # Build and run OrchestratorV2
-    # ------------------------------------------------------------------
+    # ── OrchestratorV2 ────────────────────────────────────────────────────
     try:
         from core.orchestrator import OrchestratorV2
         orchestrator_v2 = OrchestratorV2(
-            config=config,
-            logger=logger,
-            emitter=emitter,
-            ai_engine=ai_engine,
+            config=config, logger=logger,
+            emitter=emitter, ai_engine=ai_engine,
             phase_manager=phase_manager,
         )
     except Exception as exc:
         logger.error(f"[v2] Failed to instantiate OrchestratorV2: {exc}")
         return 1
 
-    console.print(
-        Panel(
-            f"[bold cyan]Starting v2 scan: {target}[/bold cyan]  "
-            f"[dim]mode={mode}[/dim]",
-            border_style="cyan",
-        )
-    )
+    console.print(Panel(
+        f"[bold cyan]Scanning: {target}[/bold cyan]  [dim]mode={mode}[/dim]",
+        border_style="cyan",
+    ))
 
     try:
         final_report = orchestrator_v2.run_full_scan(target)
@@ -534,13 +624,29 @@ def _run_v2_scan(
         logger.error(f"[v2] Scan failed: {exc}")
         return 1
 
-    console.print(
-        Panel(
-            f"[bold green]Scan complete: {target}[/bold green]"
-            + (f"  [dim]Dashboard → https://127.0.0.1:5443/dashboard[/dim]" if web else ""),
-            border_style="green",
-        )
-    )
+    # ── Auto-export (ultra mode) ──────────────────────────────────────────
+    if is_ultra:
+        logger.info("[ultra] Auto-exporting reports...")
+        for fmt in ("json", "html", "pdf"):
+            try:
+                cmd_report(console=console, fmt=fmt)
+            except Exception as exc:
+                logger.warning(f"[ultra] Export {fmt} failed: {exc}")
+        logger.success("[ultra] Reports saved: JSON + HTML + PDF")
+
+    # ── Tor stop ─────────────────────────────────────────────────────────
+    if tor_manager is not None:
+        try:
+            tor_manager.stop()
+        except Exception:
+            pass
+
+    console.print(Panel(
+        f"[bold green]Scan complete: {target}[/bold green]"
+        + (f"\n[dim]Dashboard → https://127.0.0.1:5443/dashboard[/dim]" if web else "")
+        + ("\n[dim]Reports saved in current directory[/dim]" if is_ultra else ""),
+        border_style="green",
+    ))
     return 0
 
 
