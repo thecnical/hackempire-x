@@ -323,6 +323,32 @@ class AIEngine(AIClient):
             logger.debug(f"[ai_engine] verify_finding failed: {exc}")
             return None
 
+    def generate_poc(self, vulns: list[Vulnerability]) -> list:
+        """
+        Generate Proof-of-Concept for each vulnerability.
+        Returns list of ProofOfConcept objects.
+        """
+        try:
+            from hackempire.ai.poc_generator import PoCGenerator
+            gen = PoCGenerator(ai_engine=self)
+            return gen.generate(vulns)
+        except Exception as exc:
+            logger.warning(f"[poc_gen] Failed: {exc}")
+            return []
+
+    def generate_h1_reports(self, vulns: list[Vulnerability], pocs: list | None = None) -> list:
+        """
+        Generate HackerOne-format reports for each vulnerability.
+        Returns list of H1Report objects.
+        """
+        try:
+            from hackempire.ai.report_writer import ReportWriter
+            writer = ReportWriter(ai_engine=self)
+            return writer.generate(vulns, pocs)
+        except Exception as exc:
+            logger.warning(f"[report_writer] Failed: {exc}")
+            return []
+
     def filter_false_positives(
         self,
         vulns: list[Vulnerability],

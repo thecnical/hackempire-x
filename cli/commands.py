@@ -626,7 +626,7 @@ def _run_v2_scan(
 # report
 # ---------------------------------------------------------------------------
 
-_REPORT_FORMATS = ("pdf", "json", "html", "markdown", "csv")
+_REPORT_FORMATS = ("pdf", "json", "html", "markdown", "csv", "h1")
 
 
 def cmd_report(console: Console, fmt: str = "json") -> int:
@@ -705,6 +705,24 @@ def cmd_report(console: Console, fmt: str = "json") -> int:
         out_file = Path(f"hackempire_report_{target}.csv")
         out_file.write_text(content, encoding="utf-8")
         console.print(f"[bold green]Report saved:[/bold green] {out_file}")
+        return 0
+
+    if fmt == "h1":
+        # Show HackerOne reports from ./h1_reports/
+        h1_dir = Path("./h1_reports")
+        if not h1_dir.exists():
+            console.print("[bold yellow]No H1 reports found.[/bold yellow] Run a scan first.")
+            return 0
+        md_files = list(h1_dir.glob("*.md"))
+        if not md_files:
+            console.print("[bold yellow]No H1 report files found in ./h1_reports/[/bold yellow]")
+            return 0
+        console.print(Panel(
+            f"[bold green]HackerOne Reports ({len(md_files)} files)[/bold green]\n"
+            + "\n".join(f"  {f.name}" for f in sorted(md_files)),
+            border_style="green",
+            title="[bold]./h1_reports/[/bold]",
+        ))
         return 0
 
     return 0

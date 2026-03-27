@@ -542,7 +542,6 @@ class OrchestratorV2:
                     if isinstance(raw_vulns, dict):
                         vulns_list = raw_vulns.get("vulnerabilities", [])
                         if vulns_list:
-                            from hackempire.core.models import Vulnerability  # noqa: PLC0415
                             filtered = self._ai_engine.filter_false_positives(vulns_list)
                             filtered_count = len(vulns_list) - len(filtered)
                             if filtered_count > 0:
@@ -555,9 +554,61 @@ class OrchestratorV2:
                 except Exception as exc:  # noqa: BLE001
                     self._logger.warning(f"[OrchestratorV2] FP filter failed: {exc}")
 
+            # After REPORTING phase: auto-generate PoC + H1 reports
+            if phase is Phase.REPORTING and self._ai_engine is not None:
+                self._generate_poc_and_reports(context)
+
             # After each phase: persist context via StateBridge
             if self._config.web_enabled:
                 self._persist_context(context)
+
+    def _generate_poc_and_reports(self, context: Any) -> None:
+        """
+        Phase 3: Auto-generate PoC + HackerOne reports for all verified vulns.
+        Saves reports to ./h1_reports/ directory. Never raises.
+        """
+        try:
+            from hackempire.core.phases import Phase  # noqa: PLC0415
+            # Collect all vulnerabilities from vuln_scan phase
+            vuln_data = context.phase_results.get(Phase.VULN_SCAN.value, {})
+            if not isinstance(vuln_data, dict):
+                return
+            vulns = vuln_data.get("vulnerabilities", [])
+            if not vulns:
+                self._logger.info("[OrchestratorV2] No vulnerabilities to generate PoC for")
+                return
+
+            self._logger.info(f"[OrchestratorV2] Generating PoC for {len(vulns)} vulnerabilities...")
+
+            # Generate PoCs
+            pocs = self._ai_engine.generate_poc(vulns)
+            self._logger.success(f"[OrchestratorV2] Generated {len(pocs)} PoCs")
+
+            # Generate H1 reports
+            reports = self._ai_engine.generate_h1_reports(vulns, pocs)
+            self._logger.success(f"[OrchestratorV2] Generated {len(reports)} H1 reports")
+
+            # Save reports
+            from hackempire.ai.report_writer import ReportWriter  # noqa: PLC0415
+            writer = ReportWriter(ai_engine=self._ai_engine)
+            saved = writer.save_all(reports, output_dir="./h1_reports")
+            writer.save_json(reports, output_path="./h1_reports/all_reports.json")
+
+            if saved:
+                self._logger.success(
+                    f"[OrchestratorV2] H1 reports saved to ./h1_reports/ "
+                    f"({len(saved)} files)"
+                )
+
+            # Store in context for dashboard
+            context.phase_results["poc_reports"] = {
+                "pocs": [{"vuln": p.vuln_name, "payload": p.payload, "curl": p.curl_command} for p in pocs],
+                "h1_reports": [r.to_dict() for r in reports],
+                "saved_files": saved,
+            }
+
+        except Exception as exc:  # noqa: BLE001
+            self._logger.warning(f"[OrchestratorV2] PoC/Report generation failed: {exc}")
 
     def _detect_waf(self, target: str) -> Any:
         """Run WafDetector.detect(target) and return WafResult. Never raises."""

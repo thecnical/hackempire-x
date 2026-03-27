@@ -92,9 +92,9 @@ def _build_parser() -> argparse.ArgumentParser:
     report_parser.add_argument(
         "--format",
         dest="fmt",
-        choices=["pdf", "json", "html", "markdown", "csv"],
+        choices=["pdf", "json", "html", "markdown", "csv", "h1"],
         default="json",
-        help="Output format (default: json)",
+        help="Output format (default: json). h1 = HackerOne ready reports",
     )
 
     # ------------------------------------------------------------------
