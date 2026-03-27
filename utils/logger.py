@@ -1,10 +1,23 @@
+"""
+Logger — HackEmpire X v4 logging wrapper.
+
+- Rich colored console output
+- Timestamped file output to logs/hackempire.log
+- Structured log levels: info, success, warning, error, debug
+- v4: scan_event() for structured scan lifecycle events
+"""
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from rich.console import Console
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
 
 class Logger:
@@ -13,7 +26,8 @@ class Logger:
 
     - Colored console output via Rich
     - Timestamped file output to logs/hackempire.log
-    - Level helpers: info, success, warning, error
+    - Level helpers: info, success, warning, error, debug
+    - v4: scan_event() for structured scan lifecycle events
     """
 
     def __init__(
@@ -35,9 +49,10 @@ class Logger:
         self._logger.setLevel(logging.DEBUG)
         self._logger.propagate = False
 
-        # Avoid duplicate handlers if Logger is constructed multiple times.
+        # Avoid duplicate handlers if Logger is constructed multiple times
         if not any(
-            isinstance(h, logging.FileHandler) and getattr(h, "baseFilename", None) == str(self._log_file)
+            isinstance(h, logging.FileHandler)
+            and getattr(h, "baseFilename", None) == str(self._log_file)
             for h in self._logger.handlers
         ):
             file_handler = logging.FileHandler(self._log_file, encoding="utf-8")
@@ -50,12 +65,18 @@ class Logger:
             )
             self._logger.addHandler(file_handler)
 
+    # ------------------------------------------------------------------
+    # Core log methods
+    # ------------------------------------------------------------------
+
     def _print(self, level_tag: str, message: str, *, style: str) -> None:
         self._console.print(f"[{level_tag}] {message}", style=style)
 
     def _log(self, py_level: int, level_tag: str, message: str) -> None:
-        # File logs keep the same tag format as the console output.
         self._logger.log(py_level, f"[{level_tag}] {message}")
+
+    def debug(self, message: str) -> None:
+        self._log(logging.DEBUG, "DEBUG", message)
 
     def info(self, message: str) -> None:
         self._print("INFO", message, style="bold cyan")
@@ -77,3 +98,36 @@ class Logger:
         self._console.print(f"[ERROR] {full_message}", style="bold red")
         self._log(logging.ERROR, "ERROR", full_message)
 
+    # ------------------------------------------------------------------
+    # v4: structured scan lifecycle event logging
+    # ------------------------------------------------------------------
+
+    def scan_event(self, event: str, **kwargs: object) -> None:
+        """
+        Log a structured scan lifecycle event.
+
+        Examples:
+            logger.scan_event("phase_start", phase="recon", target="example.com")
+            logger.scan_event("tool_result", tool="nmap", findings=3)
+            logger.scan_event("autonomous_decision", action="switch_tool", reason="timeout")
+            logger.scan_event("kb_write", domain="example.com", findings=5)
+        """
+        parts = [f"{k}={v!r}" for k, v in kwargs.items()]
+        msg = f"[SCAN_EVENT] {event}" + (f" | {', '.join(parts)}" if parts else "")
+        self._console.print(msg, style="dim white")
+        self._log(logging.INFO, "SCAN_EVENT", msg)
+
+    def phase_start(self, phase: str, target: str) -> None:
+        self.scan_event("phase_start", phase=phase, target=target)
+
+    def phase_complete(self, phase: str, succeeded: bool, findings: int = 0) -> None:
+        self.scan_event("phase_complete", phase=phase, succeeded=succeeded, findings=findings)
+
+    def tool_run(self, tool: str, phase: str, status: str) -> None:
+        self.scan_event("tool_run", tool=tool, phase=phase, status=status)
+
+    def autonomous_decision(self, action: str, phase: str, reason: str) -> None:
+        self.scan_event("autonomous_decision", action=action, phase=phase, reason=reason)
+
+    def kb_event(self, event: str, domain: str, **kwargs: object) -> None:
+        self.scan_event(f"kb_{event}", domain=domain, **kwargs)

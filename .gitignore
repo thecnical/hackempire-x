@@ -64,3 +64,15 @@ htmlcov/
 
 # HackEmpire config (may contain secrets)
 .hackempire/config.json
+
+# HackEmpire RAG Knowledge Base (user data, not code)
+.hackempire/kb/
+
+# H1 reports output (generated artifacts)
+h1_reports/
+
+# ysoserial JAR (downloaded binary, not source)
+/opt/ysoserial/
+
+# pspy binary (downloaded binary)
+/opt/pspy/

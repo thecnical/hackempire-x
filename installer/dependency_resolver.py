@@ -1,12 +1,13 @@
 """
-DependencyResolver — orchestrates installation of all HackEmpire X tools.
+DependencyResolver — orchestrates installation of all HackEmpire X v4 tools.
 
-Fixes:
-- git clone: skip if dest already exists
-- pip tools: installed into isolated venvs, binary symlinked to ~/.local/bin
-- crackmapexec → netexec (maintained fork)
-- ghauri/paramspider: git clone instead of pip
-- trufflehog/kiterunner: curl binary download
+Handles all v3 + v4 tools:
+  - APT batch install
+  - Go tools (requires go on PATH)
+  - Gem tools (evil-winrm)
+  - Git clone tools (skip if dest already exists)
+  - Pip tools → isolated venvs + symlink to ~/.local/bin
+  - Curl binary/JAR downloads
 """
 from __future__ import annotations
 
@@ -22,13 +23,20 @@ from utils.logger import Logger
 
 # Pip tools that need isolated venvs + their correct PyPI packages + binary names
 PIP_VENV_TOOLS: dict[str, dict] = {
-    "arjun":         {"packages": ["arjun"],           "bin": "arjun"},
-    "waymore":       {"packages": ["waymore"],          "bin": "waymore"},
-    "sslyze":        {"packages": ["sslyze"],           "bin": "sslyze"},
-    "bloodhound":    {"packages": ["bloodhound"],       "bin": "bloodhound-python"},
-    "impacket":      {"packages": ["impacket"],         "bin": "impacket-secretsdump"},
-    "netexec":       {"packages": ["netexec"],          "bin": "nxc"},
-    "ldapdomaindump":{"packages": ["ldapdomaindump"],   "bin": "ldapdomaindump"},
+    "arjun":          {"packages": ["arjun"],           "bin": "arjun"},
+    "waymore":        {"packages": ["waymore"],          "bin": "waymore"},
+    "sslyze":         {"packages": ["sslyze"],           "bin": "sslyze"},
+    "bloodhound":     {"packages": ["bloodhound"],       "bin": "bloodhound-python"},
+    "impacket":       {"packages": ["impacket"],         "bin": "impacket-secretsdump"},
+    "netexec":        {"packages": ["netexec"],          "bin": "nxc"},
+    "ldapdomaindump": {"packages": ["ldapdomaindump"],   "bin": "ldapdomaindump"},
+    # v4 pip tools
+    "semgrep":        {"packages": ["semgrep"],          "bin": "semgrep"},
+    "pypykatz":       {"packages": ["pypykatz"],         "bin": "pypykatz"},
+    "certipy-ad":     {"packages": ["certipy-ad"],       "bin": "certipy"},
+    "atomic-operator":{"packages": ["atomic-operator"],  "bin": "atomic-operator"},
+    "recon-ng":       {"packages": ["recon-ng"],         "bin": "recon-ng"},
+    "wpprobe":        {"packages": ["wpprobe"],          "bin": "wpprobe"},
 }
 
 
@@ -50,43 +58,39 @@ class DependencyResolver:
         pip_tools  = self._filter_by_method(tool_names, "pip")
         curl_tools = self._filter_by_method(tool_names, "curl")
 
-        # Unknown tools
         known = set(apt_tools + go_tools + gem_tools + git_tools + pip_tools + curl_tools)
         for name in tool_names:
             if name not in known:
                 self._logger.warning(f"[resolver] No spec for '{name}' — skipping.")
                 results[name] = "skipped"
 
-        # 1. APT batch install
         if apt_tools:
             self._install_apt_group(apt_tools, results)
 
-        # 2. Go tools
         if go_tools:
             if not shutil.which("go"):
                 self._logger.warning("[resolver] 'go' not on PATH — skipping Go tools.")
-                for n in go_tools: results[n] = "skipped"
+                for n in go_tools:
+                    results[n] = "skipped"
             else:
                 for n in go_tools:
                     results[n] = self._install_single(n)
 
-        # 3. Gem tools
         if gem_tools:
             if not shutil.which("ruby"):
-                for n in gem_tools: results[n] = "skipped"
+                self._logger.warning("[resolver] 'ruby' not on PATH — skipping gem tools.")
+                for n in gem_tools:
+                    results[n] = "skipped"
             else:
                 for n in gem_tools:
                     results[n] = self._install_single(n)
 
-        # 4. Git tools (skip if already cloned)
         for n in git_tools:
             results[n] = self._install_git_tool(n)
 
-        # 5. Pip tools → isolated venvs
         for n in pip_tools:
             results[n] = self._install_pip_venv_tool(n)
 
-        # 6. Curl binary downloads
         for n in curl_tools:
             results[n] = self._install_single(n)
 
@@ -95,7 +99,7 @@ class DependencyResolver:
     def install_system_packages(self, packages: list[str]) -> bool:
         if not packages:
             return True
-        cmd = ["apt-get", "install", "-y", "--no-install-recommends"] + packages
+        cmd = ["sudo", "apt-get", "install", "-y", "--no-install-recommends"] + packages
         self._logger.info(f"[resolver] apt-get install: {packages}")
         try:
             r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=600)
@@ -138,10 +142,8 @@ class DependencyResolver:
             return "skipped"
         dest = Path(spec.git_dest) if spec.git_dest else Path(f"/opt/{name}")
 
-        # Skip if already cloned — this is the key fix
         if dest.exists():
             self._logger.info(f"[resolver] '{name}' already at {dest} — skipping clone.")
-            # Still try to install requirements into venv
             self._maybe_install_requirements(name, dest)
             return "already_installed"
 
@@ -163,8 +165,11 @@ class DependencyResolver:
     def _maybe_install_requirements(self, name: str, dest: Path) -> None:
         req = dest / "requirements.txt"
         if req.exists():
-            pkgs = [l.strip() for l in req.read_text(errors="replace").splitlines()
-                    if l.strip() and not l.startswith("#")]
+            pkgs = [
+                line.strip()
+                for line in req.read_text(errors="replace").splitlines()
+                if line.strip() and not line.startswith("#")
+            ]
             if pkgs:
                 self._venv_manager.ensure_venv(name, pkgs)
 
@@ -174,11 +179,13 @@ class DependencyResolver:
         if spec is None:
             return "skipped"
 
-        venv_info = PIP_VENV_TOOLS.get(name, {"packages": [spec.package], "bin": spec.check_bin or name})
+        venv_info = PIP_VENV_TOOLS.get(name, {
+            "packages": [spec.package],
+            "bin": spec.check_bin or name,
+        })
         packages = venv_info["packages"]
         bin_name = venv_info["bin"]
 
-        # Check if already installed
         if shutil.which(bin_name):
             self._logger.info(f"[resolver] '{name}' ({bin_name}) already on PATH.")
             return "already_installed"
@@ -188,7 +195,6 @@ class DependencyResolver:
         if venv_python is None:
             return "failed"
 
-        # Symlink the binary to ~/.local/bin so it's on PATH
         venv_bin_dir = venv_python.parent
         bin_src = venv_bin_dir / bin_name
         if bin_src.exists():
