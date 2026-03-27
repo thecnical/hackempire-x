@@ -142,9 +142,33 @@ HackEmpire X stores all configuration in:
 ~/.hackempire/config.json
 ```
 
-This file is **created automatically** — you never need to create it manually.
+This file is **created automatically on first run** — you never need to create it manually. After running `./hackempire --status` or any command, the file will exist at:
 
-### Step 1 — Set your AI keys
+```
+/home/YOUR_USERNAME/.hackempire/config.json
+```
+
+### View your config
+
+```bash
+./hackempire config show
+```
+
+Or read it directly:
+```bash
+cat ~/.hackempire/config.json
+```
+
+It will look like this (empty keys until you fill them in):
+```json
+{
+  "bytez_key": "",
+  "openrouter_key": "",
+  "proxy": ""
+}
+```
+
+### Set your AI keys
 
 ```bash
 # Bytez AI — primary provider (https://bytez.com)
@@ -154,44 +178,11 @@ This file is **created automatically** — you never need to create it manually.
 ./hackempire config openrouter_key YOUR_OPENROUTER_KEY
 ```
 
-### Step 2 — View your current config
-
-```bash
-./hackempire config show
-```
-
 ### Other options
 
 ```bash
 # Route all tool traffic through Burp Suite
 ./hackempire config proxy http://127.0.0.1:8080
-```
-
-### Config file location
-
-Always at:
-```
-/home/YOUR_USERNAME/.hackempire/config.json
-```
-
-Example on Kali with user `abhay`:
-```
-/home/abhay/.hackempire/config.json
-```
-
-View or edit directly:
-```bash
-cat ~/.hackempire/config.json
-nano ~/.hackempire/config.json
-```
-
-Example contents:
-```json
-{
-  "bytez_key": "bz-xxxxxxxxxxxxxxxxxxxx",
-  "openrouter_key": "sk-or-xxxxxxxxxxxxxxxxxxxx",
-  "proxy": "http://127.0.0.1:8080"
-}
 ```
 
 ### Where to get API keys

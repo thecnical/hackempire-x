@@ -24,47 +24,71 @@ from utils.logger import Logger
 
 _ROOT = Path(__file__).resolve().parent.parent
 
+# ---------------------------------------------------------------------------
+# Config helpers — defined early so all commands can use them
+# Config lives in ~/.hackempire/config.json (user home, NOT repo folder)
+# ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# --status
-# ---------------------------------------------------------------------------
+_CONFIG_DIR = Path.home() / ".hackempire"
+_CONFIG_FILE = _CONFIG_DIR / "config.json"
+
+
+def _load_config() -> dict:
+    """Load config from ~/.hackempire/config.json. Creates template if missing."""
+    _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    if not _CONFIG_FILE.exists():
+        template = {"bytez_key": "", "openrouter_key": "", "proxy": ""}
+        _CONFIG_FILE.write_text(json.dumps(template, indent=2), encoding="utf-8")
+    try:
+        return json.loads(_CONFIG_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_config(data: dict) -> None:
+    """Save config dict to ~/.hackempire/config.json."""
+    _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    _CONFIG_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 def cmd_status(console: Console) -> int:
     """Show system and tool installation status."""
-    from installer.tool_installer import TOOL_INSTALL_SPECS
+    from installer.tool_installer import TOOL_INSTALL_SPECS, ToolInstaller
+    from utils.logger import Logger as _Logger
+
+    # Auto-create config file on first run
+    _load_config()
+
+    installer = ToolInstaller(logger=_Logger(console=console), auto_approve=False)
 
     table = Table(title="Tool Status", border_style="cyan", show_lines=True)
     table.add_column("Tool", style="bold white")
-    table.add_column("Binary", style="dim")
+    table.add_column("Check", style="dim")
     table.add_column("Status", justify="center")
-    table.add_column("Install Method", style="dim")
+    table.add_column("Method", style="dim")
+    table.add_column("Location", style="dim")
 
     for name, spec in TOOL_INSTALL_SPECS.items():
-        binary = spec.check_bin if spec.check_bin else spec.name
-        found = shutil.which(binary) is not None
-        status = Text("INSTALLED", style="bold green") if found else Text("MISSING", style="bold red")
-        table.add_row(name, binary, status, spec.method)
+        installed = installer.check_installed(name)
+        status = Text("INSTALLED", style="bold green") if installed else Text("MISSING", style="bold red")
+        check = spec.check_bin if spec.check_bin else spec.name
+        location = spec.git_dest if spec.method == "git" else ("~/.local/bin" if spec.method == "pip" else "PATH")
+        table.add_row(name, check, status, spec.method, location)
 
     console.print(table)
 
-    # Python version
     v = sys.version_info
     py_ok = (v.major, v.minor) >= (3, 11)
     py_style = "bold green" if py_ok else "bold red"
-    console.print(
-        f"\n  Python [bold]{v.major}.{v.minor}.{v.micro}[/bold] — "
-        f"[{py_style}]{'OK' if py_ok else 'REQUIRES >= 3.11'}[/{py_style}]"
-    )
+    console.print(f"\n  Python [bold]{v.major}.{v.minor}.{v.micro}[/bold] — [{py_style}]{'OK' if py_ok else 'REQUIRES >= 3.11'}[/{py_style}]")
 
-    # Required packages
     import importlib.util
-    packages = {"rich": "rich", "requests": "requests", "flask": "flask"}
-    for import_name, pip_name in packages.items():
+    for import_name, pip_name in {"rich": "rich", "requests": "requests", "flask": "flask"}.items():
         found_pkg = importlib.util.find_spec(import_name) is not None
         style = "bold green" if found_pkg else "bold red"
-        label = "OK" if found_pkg else "MISSING — run: pip install " + pip_name
-        console.print(f"  Package [bold]{pip_name}[/bold] — [{style}]{label}[/{style}]")
+        console.print(f"  Package [bold]{pip_name}[/bold] — [{style}]{'OK' if found_pkg else 'MISSING'}[/{style}]")
 
+    # Show config file location
+    console.print(f"\n  Config file: [cyan]{_CONFIG_FILE}[/cyan]  {'[green]exists[/green]' if _CONFIG_FILE.exists() else '[dim]not created yet — run: ./hackempire config bytez_key YOUR_KEY[/dim]'}")
     console.print()
     return 0
 
@@ -665,30 +689,8 @@ def cmd_terminal(console: Console) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Config helpers — used by multiple commands
+# config
 # ---------------------------------------------------------------------------
-
-# Config lives in the user's home directory, NOT inside the repo
-_CONFIG_DIR = Path.home() / ".hackempire"
-_CONFIG_FILE = _CONFIG_DIR / "config.json"
-
-
-def _load_config() -> dict:
-    """Load config from ~/.hackempire/config.json. Creates it if missing."""
-    _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    if not _CONFIG_FILE.exists():
-        _CONFIG_FILE.write_text(json.dumps({}, indent=2), encoding="utf-8")
-    try:
-        return json.loads(_CONFIG_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return {}
-
-
-def _save_config(data: dict) -> None:
-    """Save config dict to ~/.hackempire/config.json."""
-    _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    _CONFIG_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
 
 def cmd_config(console: Console, key: str, value: str) -> int:
     """Write a key/value pair to ~/.hackempire/config.json."""
