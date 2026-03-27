@@ -432,18 +432,17 @@ def cmd_scan(
         )
 
     # ------------------------------------------------------------------
-    # Legacy path — recon-only
+    # Legacy path — recon-only → route to v2 scan
     # ------------------------------------------------------------------
-    orchestrator_mode = "beginner"
-    from cli.cli import _run_single_target
-    return _run_single_target(
+    return _run_v2_scan(
         console=console,
         logger=logger,
         target=target,
-        mode=orchestrator_mode,
+        mode="full",
         ai_key=ai_key,
         web=web,
         proxy=proxy,
+        autonomous=autonomous,
     )
 
 
@@ -463,6 +462,8 @@ def _run_v2_scan(
 
     # ── ULTRA MODE: single command, full power ────────────────────────────
     is_ultra = (mode == "ultra")
+    # Auto-approve tool installs during scan — no blocking prompts
+    os.environ["HACKEMPIRE_AUTO_APPROVE"] = "1"
     if is_ultra:
         console.print(Panel(
             "[bold red]⚡ ULTRA MODE ACTIVATED[/bold red]\n\n"
@@ -492,7 +493,8 @@ def _run_v2_scan(
         logger.error("Failed to prepare configuration", exc=exc)
         return 1
 
-    # ── Load AI keys from config ──────────────────────────────────────────    ai_engine = None
+    # ── Load AI keys from config ──────────────────────────────────────────
+    ai_engine = None
     try:
         from ai.ai_engine import AIEngine
         saved = _load_config()

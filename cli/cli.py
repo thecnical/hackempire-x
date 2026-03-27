@@ -32,6 +32,27 @@ from utils.validator import validate_target
 # Argument parser
 # ---------------------------------------------------------------------------
 
+def _build_legacy_parser() -> argparse.ArgumentParser:
+    """Legacy parser — no subcommands, positional target only."""
+    parser = argparse.ArgumentParser(
+        prog="hackempire",
+        description="HackEmpire X — AI-Orchestrated Pentesting Platform",
+        add_help=False,
+    )
+    parser.add_argument("target", nargs="?", default=None)
+    parser.add_argument("--mode", choices=["beginner", "pro", "lab"], default=None)
+    parser.add_argument("--ai-key", dest="ai_key", default=None)
+    parser.add_argument("--web", action="store_true", default=False)
+    parser.add_argument("--proxy", default=None)
+    parser.add_argument("--target-file", dest="target_file", default=None)
+    parser.add_argument("--status", action="store_true", default=False)
+    parser.add_argument("--doctor", action="store_true", default=False)
+    parser.add_argument("--clean", action="store_true", default=False)
+    parser.add_argument("--uninstall", action="store_true", default=False)
+    parser.add_argument("--resume", action="store_true", default=False)
+    return parser
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hackempire",
@@ -124,74 +145,16 @@ def _build_parser() -> argparse.ArgumentParser:
     config_parser.add_argument("value", nargs="?", default=None, help="Config value")
 
     # ------------------------------------------------------------------
-    # Legacy positional target (kept for backward compatibility)
+    # Global utility flags (no target needed)
     # ------------------------------------------------------------------
-    parser.add_argument(
-        "target",
-        nargs="?",
-        default=None,
-        help="Target domain or IP address (legacy positional form)",
-    )
-
-    # Scan options (legacy)
-    parser.add_argument(
-        "--mode",
-        choices=["beginner", "pro", "lab"],
-        default=None,
-        help="Execution mode (required for legacy scans)",
-    )
-    parser.add_argument(
-        "--ai-key",
-        dest="ai_key",
-        default=None,
-        help="OpenRouter API key for AI-assisted decisions",
-    )
-    parser.add_argument(
-        "--web",
-        action="store_true",
-        default=False,
-        help="Launch web dashboard at https://127.0.0.1:5443/dashboard",
-    )
-    parser.add_argument(
-        "--proxy",
-        dest="proxy",
-        default=None,
-        metavar="URL",
-        help="Route all tool traffic through a proxy (e.g. http://127.0.0.1:8080 for Burp Suite)",
-    )
-    parser.add_argument(
-        "--target-file",
-        dest="target_file",
-        default=None,
-        metavar="FILE",
-        help="Path to a file containing one target per line (multi-target mode)",
-    )
-
-    # Global utility commands
-    parser.add_argument(
-        "--status",
-        action="store_true",
-        default=False,
-        help="Show system and tool installation status",
-    )
-    parser.add_argument(
-        "--doctor",
-        action="store_true",
-        default=False,
-        help="Run the Tool Doctor to diagnose and fix broken tools",
-    )
-    parser.add_argument(
-        "--clean",
-        action="store_true",
-        default=False,
-        help="Clear logs and temporary files",
-    )
-    parser.add_argument(
-        "--uninstall",
-        action="store_true",
-        default=False,
-        help="Completely remove HackEmpire X (logs, cache, optionally packages)",
-    )
+    parser.add_argument("--status", action="store_true", default=False,
+                        help="Show system and tool installation status")
+    parser.add_argument("--doctor", action="store_true", default=False,
+                        help="Run the Tool Doctor to diagnose and fix broken tools")
+    parser.add_argument("--clean", action="store_true", default=False,
+                        help="Clear logs and temporary files")
+    parser.add_argument("--uninstall", action="store_true", default=False,
+                        help="Completely remove HackEmpire X")
 
     return parser
 
@@ -201,55 +164,68 @@ def _build_parser() -> argparse.ArgumentParser:
 # ---------------------------------------------------------------------------
 
 def run_cli(argv: Optional[list[str]] = None) -> int:
-    parser = _build_parser()
-    args = parser.parse_args(argv)
+    if argv is None:
+        argv = sys.argv[1:]
 
     console = Console(legacy_windows=True, emoji=False)
-
-    # Always show the banner first
     print_banner(console)
 
-    # -----------------------------------------------------------------------
-    # New subcommands
-    # -----------------------------------------------------------------------
     from cli.commands import (
         cmd_status, cmd_doctor, cmd_clean, cmd_uninstall,
         cmd_scan, cmd_report, cmd_install_tools, cmd_terminal, cmd_config,
         cmd_config_show,
     )
 
-    if args.subcommand == "scan":
-        return cmd_scan(
-            console=console,
-            target=args.target,
-            mode=args.mode,
-            ai_key=args.ai_key,
-            web=args.web,
-            proxy=args.proxy,
-            resume=args.resume,
-            autonomous=getattr(args, "autonomous", False),
-        )
+    # -----------------------------------------------------------------------
+    # Detect subcommand from first argument BEFORE argparse
+    # This avoids the legacy positional 'target' consuming 'scan' keyword
+    # -----------------------------------------------------------------------
+    _SUBCOMMANDS = ("scan", "report", "install-tools", "terminal", "config")
+    first_arg = argv[0] if argv else ""
 
-    if args.subcommand == "report":
-        return cmd_report(console=console, fmt=args.fmt)
+    if first_arg in _SUBCOMMANDS:
+        # Route to new subcommand parsers
+        parser = _build_parser()
+        args = parser.parse_args(argv)
 
-    if args.subcommand == "install-tools":
-        return cmd_install_tools(console=console)
+        if args.subcommand == "scan":
+            return cmd_scan(
+                console=console,
+                target=args.target,
+                mode=args.mode,
+                ai_key=args.ai_key,
+                web=args.web,
+                proxy=args.proxy,
+                resume=args.resume,
+                autonomous=getattr(args, "autonomous", False),
+            )
 
-    if args.subcommand == "terminal":
-        return cmd_terminal(console=console)
+        if args.subcommand == "report":
+            return cmd_report(console=console, fmt=args.fmt)
 
-    if args.subcommand == "config":
-        if args.key is None or args.key == "show":
-            return cmd_config_show(console=console)
-        if args.value is None:
-            console.print(f"[bold red]Error:[/bold red] provide a value: ./hackempire config {args.key} YOUR_VALUE")
-            return 2
-        return cmd_config(console=console, key=args.key, value=args.value)
+        if args.subcommand == "install-tools":
+            return cmd_install_tools(console=console)
+
+        if args.subcommand == "terminal":
+            return cmd_terminal(console=console)
+
+        if args.subcommand == "config":
+            if args.key is None or args.key == "show":
+                return cmd_config_show(console=console)
+            if args.value is None:
+                console.print(f"[bold red]Error:[/bold red] provide a value: ./hackempire config {args.key} YOUR_VALUE")
+                return 2
+            return cmd_config(console=console, key=args.key, value=args.value)
+
+        return 0
 
     # -----------------------------------------------------------------------
+    # Legacy path — no subcommand keyword detected
+    # -----------------------------------------------------------------------
+    parser = _build_legacy_parser()
+    args = parser.parse_args(argv)
+
     # Legacy global utility commands — no target required
-    # -----------------------------------------------------------------------
     if args.uninstall:
         return cmd_uninstall(console)
 

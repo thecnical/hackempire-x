@@ -218,6 +218,9 @@ class ToolInstaller:
     def _ask_permission(self, tool_name: str, spec: ToolInstallSpec) -> bool:
         if self._auto_approve:
             return True
+        # Also respect env var for non-interactive / scan mode
+        if os.environ.get("HACKEMPIRE_AUTO_APPROVE", "").lower() in ("1", "true", "yes"):
+            return True
         try:
             ans = input(f"\n[HackEmpire X] '{tool_name}' missing. Install via {spec.method}? (y/n): ").strip().lower()
         except (EOFError, OSError):
