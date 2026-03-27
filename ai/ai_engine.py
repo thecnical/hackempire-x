@@ -298,6 +298,28 @@ class AIEngine(AIClient):
             logger.error("suggest_exploits error: %s", exc)
             return self._kb_exploit_suggestions(vulns)
 
+    def filter_false_positives(
+        self,
+        vulns: list[Vulnerability],
+        confidence_threshold: float = 0.60,
+    ) -> list[Vulnerability]:
+        """
+        Filter false positives from a list of vulnerabilities.
+
+        Uses FalsePositiveFilter with this AI engine for verification.
+        Returns only real findings with confidence >= threshold.
+        """
+        try:
+            from hackempire.ai.false_positive_filter import FalsePositiveFilter
+            fp_filter = FalsePositiveFilter(
+                ai_engine=self,
+                confidence_threshold=confidence_threshold,
+            )
+            return fp_filter.filter(vulns)
+        except Exception as exc:
+            logger.warning(f"[fp_filter] Filter failed: {exc} — returning all findings")
+            return vulns
+
     def generate_report_summary(self, full_state: dict) -> str:
         """
         Generate an executive summary string from the full scan state.
@@ -358,21 +380,29 @@ class AIEngine(AIClient):
         result_json = _sanitize_context_for_prompt(result)
         context_json = _sanitize_context_for_prompt(context)
         return (
-            "You are an elite penetration testing AI.\n\n"
-            f"Phase: {phase}\n"
-            f"Phase Result: {result_json}\n"
-            f"Scan Context: {context_json}\n\n"
-            "Analyze the phase result and provide next-step guidance.\n\n"
+            "You are an elite penetration tester and bug bounty hunter with 10+ years experience.\n\n"
+            f"Current phase: {phase}\n"
+            f"Phase results: {result_json}\n"
+            f"Full scan context: {context_json}\n\n"
+            "Analyze the results and decide the best next attack steps.\n\n"
+            "Think like an attacker:\n"
+            "- What attack surface was discovered?\n"
+            "- What are the highest-value targets?\n"
+            "- What vulnerabilities are most likely given the tech stack?\n"
+            "- What tools should run next for maximum impact?\n\n"
             "OUTPUT FORMAT (strict JSON only):\n"
             "{\n"
-            '  "phase": "' + phase + '",\n'
-            '  "summary": "...",\n'
+            f'  "phase": "{phase}",\n'
+            '  "summary": "Brief analysis of what was found",\n'
+            '  "attack_surface": ["item1", "item2"],\n'
             '  "suggested_tools": ["tool1", "tool2"],\n'
-            '  "exploit_chains": ["chain1", "chain2"],\n'
+            '  "exploit_chains": ["chain1: step1 -> step2"],\n'
+            '  "priority_targets": ["url1", "url2"],\n'
+            '  "vuln_hypotheses": ["possible vuln1", "possible vuln2"],\n'
             '  "confidence": 0.8\n'
             "}\n\n"
             "RULES: Output ONLY valid JSON. No explanation. No markdown. "
-            "confidence must be between 0 and 1."
+            "confidence must be 0.0-1.0."
         )
 
     def _build_exploit_prompt(self, vulns: list[Vulnerability]) -> str:
@@ -452,6 +482,10 @@ class AIEngine(AIClient):
         suggested_tools = data.get("suggested_tools", [])
         exploit_chains = data.get("exploit_chains", [])
         confidence = data.get("confidence", 0.0)
+        # New Phase 2 fields
+        attack_surface = data.get("attack_surface", [])
+        priority_targets = data.get("priority_targets", [])
+        vuln_hypotheses = data.get("vuln_hypotheses", [])
 
         if not isinstance(suggested_tools, list):
             suggested_tools = []
@@ -463,13 +497,27 @@ class AIEngine(AIClient):
         except (TypeError, ValueError):
             confidence = 0.0
 
-        return AIDecision(
+        decision = AIDecision(
             phase=phase,
             summary=summary,
             suggested_tools=[str(t) for t in suggested_tools],
             exploit_chains=[str(c) for c in exploit_chains],
             confidence=confidence,
         )
+        # Attach extra intelligence as dynamic attributes
+        if attack_surface:
+            object.__setattr__(decision, "attack_surface", attack_surface) if hasattr(decision, "__slots__") else setattr(decision, "attack_surface", attack_surface)
+        if priority_targets:
+            try:
+                decision.priority_targets = priority_targets  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        if vuln_hypotheses:
+            try:
+                decision.vuln_hypotheses = vuln_hypotheses  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        return decision
 
     def _parse_suggestions(self, raw_text: str) -> list[str]:
         text = raw_text.strip()

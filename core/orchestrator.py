@@ -535,6 +535,26 @@ class OrchestratorV2:
                         f"[OrchestratorV2] AI analysis failed for phase '{phase.value}': {exc}"
                     )
 
+            # After VULN_SCAN: run false positive filter
+            if phase is Phase.VULN_SCAN and self._ai_engine is not None:
+                try:
+                    raw_vulns = context.phase_results.get(phase.value, {})
+                    if isinstance(raw_vulns, dict):
+                        vulns_list = raw_vulns.get("vulnerabilities", [])
+                        if vulns_list:
+                            from hackempire.core.models import Vulnerability  # noqa: PLC0415
+                            filtered = self._ai_engine.filter_false_positives(vulns_list)
+                            filtered_count = len(vulns_list) - len(filtered)
+                            if filtered_count > 0:
+                                self._logger.info(
+                                    f"[OrchestratorV2] FP filter: removed {filtered_count} "
+                                    f"false positives from {len(vulns_list)} findings"
+                                )
+                            raw_vulns["vulnerabilities"] = filtered
+                            raw_vulns["fp_filtered_count"] = filtered_count
+                except Exception as exc:  # noqa: BLE001
+                    self._logger.warning(f"[OrchestratorV2] FP filter failed: {exc}")
+
             # After each phase: persist context via StateBridge
             if self._config.web_enabled:
                 self._persist_context(context)
