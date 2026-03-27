@@ -9,14 +9,14 @@
  ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝    ╚═╝  ╚═╝
 ```
 
-**AI-Orchestrated Offensive Security Platform — v2.1**
+**AI-Orchestrated Offensive Security Platform — v4.0**
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=flat-square&logo=python)](https://python.org)
 [![Platform](https://img.shields.io/badge/Platform-Kali%20Linux-557C94?style=flat-square&logo=linux)](https://kali.org)
 [![CI](https://github.com/thecnical/hackempire-x/actions/workflows/ci.yml/badge.svg)](https://github.com/thecnical/hackempire-x/actions)
-[![Tests](https://img.shields.io/badge/Tests-84%20passing-brightgreen?style=flat-square)](https://github.com/thecnical/hackempire-x/actions)
+[![Tests](https://img.shields.io/badge/Tests-197%20passing-brightgreen?style=flat-square)](https://github.com/thecnical/hackempire-x/actions)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Tools](https://img.shields.io/badge/Tools-40%2B-red?style=flat-square)](https://github.com/thecnical/hackempire-x)
+[![Tools](https://img.shields.io/badge/Tools-55%2B-red?style=flat-square)](https://github.com/thecnical/hackempire-x)
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support%20the%20project-yellow?style=flat-square&logo=buy-me-a-coffee)](https://buymeacoffee.com/chandanpandit)
 
@@ -30,12 +30,20 @@
 
 ## What is HackEmpire X?
 
-HackEmpire X is a **full-stack AI-orchestrated offensive security platform** built for bug bounty hunters, red teamers, and penetration testers. It runs a complete **7-phase attack pipeline** — from passive recon to post-exploitation and reporting — with 40+ integrated tools, automatic fallback chains, real-time AI decision making, and a live web dashboard.
+HackEmpire X is a **full-stack AI-orchestrated offensive security platform** built for bug bounty hunters, red teamers, and penetration testers. It runs a complete **7-phase attack pipeline** — from passive recon to post-exploitation and reporting — with 55+ integrated tools, automatic fallback chains, real-time AI decision making, and a live web dashboard.
+
+**v4 brings six major upgrades:**
+- Multi-model Bytez AI fallback chain (5 free models before OpenRouter)
+- Autonomous scan mode — AI drives the entire attack with zero human input
+- RAG-style persistent knowledge base — learns from every scan
+- 20+ new tool integrations (55+ total)
+- Structured AI deep-tool knowledge for every integrated tool
+- Dashboard v2 with AttackGraph, MITRE ATT&CK overlay, live PoC preview, autonomous feed, and KB viewer
 
 One command. Full attack surface coverage.
 
 ```bash
-./hackempire scan example.com --mode full --web
+./hackempire scan example.com --mode ultra --web
 ```
 
 ---
@@ -43,35 +51,111 @@ One command. Full attack surface coverage.
 ## Architecture
 
 ```
-                         ┌─────────────────────────────────────────┐
-                         │           OrchestratorV2                │
-                         │                                         │
-  Target ──────────────► │  RECON → URL_DISC → ENUM → VULN_SCAN   │
-                         │  EXPLOITATION → POST_EXPLOIT → REPORT  │
-                         │                                         │
-                         │  Each phase: FallbackChain              │
-                         │  [tool1→tool2→...→tool6→AegisBridge]   │
-                         │                                         │
-                         │  AIEngine v2                            │
-                         │  ├─ Bytez AI (primary)                  │
-                         │  ├─ OpenRouter (fallback)               │
-                         │  ├─ TodoPlanner (7×6 task matrix)       │
-                         │  ├─ PhaseAnalyzer (per-phase decisions) │
-                         │  └─ PentestKnowledgeBase (offline KB)   │
-                         │                                         │
-                         │  WafDetector → WafBypassStrategy        │
-                         │  TorManager (stealth via proxychains4)  │
-                         │  ToolVenvManager (isolated pip envs)    │
-                         └──────────────┬──────────────────────────┘
+                         ┌──────────────────────────────────────────────┐
+                         │              OrchestratorV2                  │
+                         │                                              │
+  Target ──────────────► │  RECON → URL_DISC → ENUM → VULN_SCAN        │
+                         │  EXPLOITATION → POST_EXPLOIT → REPORT       │
+                         │                                              │
+                         │  Each phase: FallbackChain                   │
+                         │  [tool1→tool2→...→AegisBridge]              │
+                         │                                              │
+                         │  AIEngine v4                                 │
+                         │  ├─ ModelChain: Qwen3-4B → Mistral-7B →     │
+                         │  │             gemma-3-4b → gpt-4o-mini →   │
+                         │  │             gpt-4.1-mini (all free)       │
+                         │  ├─ OpenRouter (fallback)                    │
+                         │  ├─ OfflineKB (OWASP Top 10 + API Top 10)   │
+                         │  ├─ AutonomousEngine (AI-driven decisions)   │
+                         │  ├─ ToolKnowledge Registry (55+ entries)     │
+                         │  └─ RAG_KB (~/.hackempire/kb/)               │
+                         │                                              │
+                         │  WafDetector → WafBypassStrategy             │
+                         │  TorManager (stealth via proxychains4)       │
+                         │  ToolVenvManager (isolated pip envs)         │
+                         └──────────────┬───────────────────────────────┘
                                         │
-                    ┌───────────────────┴───────────────────┐
-                    │                                       │
-             Rich CLI (TLS)                    Web Dashboard (HTTPS :5443)
-             4 scan modes                      Real-time SocketIO
-             5 report formats                  xterm.js terminal
-             Doctor + Status                   Chart.js radar map
-                                               Live vuln feed
+                    ┌───────────────────┴────────────────────┐
+                    │                                        │
+             Rich CLI (TLS)                    Dashboard v2 (HTTPS :5443)
+             6 scan modes                      AttackGraph (vis.js)
+             5 report formats                  MITRE ATT&CK Overlay
+             Doctor + Status                   Live PoC Preview
+                                               Autonomous Feed
+                                               KB Viewer
+                                               xterm.js terminal
 ```
+
+---
+
+## What's New in v4
+
+### v4.1 — Multi-Model Bytez AI Fallback Chain
+The AIEngine now tries 5 free Bytez models in priority order before falling back to OpenRouter:
+
+```
+Qwen/Qwen3-4B → Mistral-7B → gemma-3-4b-it → gpt-4o-mini → gpt-4.1-mini → OpenRouter → OfflineKB
+```
+
+- Single Bytez API key works across all 5 models
+- 90-second total budget enforced across the full chain
+- Every successful response records which model produced it
+- No API key? Skips straight to OpenRouter → OfflineKB — zero exceptions
+
+### v4.2 — Autonomous Scan Mode
+Activate with `--mode ultra` or `--autonomous`. The AI drives the entire attack:
+
+- Selects the next tool based on ToolKnowledge + accumulated scan context
+- Analyzes each tool's output and decides: `continue`, `switch_tool`, or `next_phase`
+- Logs every decision with reason to the AutonomousFeed dashboard panel
+- Applies FallbackChain on tool errors — never stops mid-scan
+- Terminates cleanly when all 7 phases complete or no attack surface remains
+
+### v4.3 — RAG Knowledge Base
+Persistent on-disk KB at `~/.hackempire/kb/`:
+
+- Stores findings, working payloads, and attack patterns after every scan
+- Queries matching entries before generating the todo list — future scans start smarter
+- Appends confirmed payloads immediately during EXPLOITATION/POST_EXPLOIT
+- Deduplicates entries by `(target, finding_name, url)` hash
+- Auto-creates directory on first write — no manual setup
+
+### v4.4 — 20+ New Tool Integrations (55+ total)
+
+| Phase | New Tools Added |
+|-------|----------------|
+| RECON | theHarvester, recon-ng, dnsenum, fierce |
+| ENUMERATION | WPProbe, wpscan, joomscan |
+| VULN_SCAN | SSTImap, zaproxy, semgrep |
+| EXPLOITATION | MetasploitMCP, ysoserial, certipy |
+| POST_EXPLOIT | AdaptixC2, Atomic-Operator, pypykatz, pspy, evil-winrm |
+
+### v4.5 — AI Deep Tool Knowledge
+Every one of the 55+ tools has a structured `ToolKnowledge` entry:
+
+```python
+ToolKnowledge(
+    when_to_use="...",        # when to select this tool
+    what_to_look_for="...",   # output patterns that indicate a finding
+    success_indicator="...",  # machine-checkable success condition
+    failure_action="try_next_tool | skip_phase | escalate_to_ai",
+    next_tool="...",          # recommended follow-up tool
+    next_phase_trigger="...", # condition that signals phase advance
+)
+```
+
+The AutonomousEngine consults this registry before every decision.
+
+### v4.6 — Dashboard v2
+Five new panels on top of all v3 dashboard features:
+
+| Panel | Description |
+|-------|-------------|
+| **AttackGraph** | Directed graph of hosts, services, and exploit paths — live via SocketIO |
+| **MITREOverlay** | ATT&CK technique grid — cells highlight as findings are confirmed |
+| **PoCPreview** | Live curl command + affected URL for the latest generated PoC |
+| **AutonomousFeed** | Real-time log of every AI decision during autonomous mode |
+| **KBViewer** | Browse and search all RAG_KB entries for the current target |
 
 ---
 
@@ -79,26 +163,18 @@ One command. Full attack surface coverage.
 
 ### 7-Phase Attack Pipeline
 
-| Phase | Tools |
-|-------|-------|
-| **RECON** | subfinder, httpx, dnsx, nmap, whatweb, assetfinder |
+| Phase | Tools (v3 + v4 additions) |
+|-------|--------------------------|
+| **RECON** | subfinder, httpx, dnsx, nmap, whatweb, assetfinder, amass, **theHarvester, recon-ng, dnsenum, fierce** |
 | **URL_DISCOVERY** | katana, gau, waybackurls, hakrawler, gospider, cariddi |
-| **ENUMERATION** | feroxbuster, ffuf, dirsearch, arjun, gobuster, kiterunner |
-| **VULN_SCAN** | nuclei, nikto, naabu, afrog, sslyze, interactsh-client |
-| **EXPLOITATION** | dalfox, sqlmap, commix, tplmap, ghauri, xsstrike |
-| **POST_EXPLOIT** | linpeas, netexec, chisel, ligolo-ng, impacket, bloodhound |
-| **REPORTING** | PDF, JSON, HTML, Markdown, CSV |
+| **ENUMERATION** | feroxbuster, ffuf, dirsearch, arjun, gobuster, kiterunner, **WPProbe, wpscan, joomscan** |
+| **VULN_SCAN** | nuclei, nikto, naabu, afrog, sslyze, interactsh-client, **SSTImap, zaproxy, semgrep** |
+| **EXPLOITATION** | dalfox, sqlmap, commix, tplmap, ghauri, xsstrike, **MetasploitMCP, ysoserial, certipy** |
+| **POST_EXPLOIT** | linpeas, netexec, chisel, ligolo-ng, impacket, bloodhound, **AdaptixC2, Atomic-Operator, pypykatz, pspy, evil-winrm** |
+| **REPORTING** | PDF, JSON, HTML, Markdown, CSV + HackerOne format |
 
 ### FallbackChain — Never Stops
-Every phase runs 6 tools in sequence. If a tool fails, times out, or isn't installed, the next one takes over automatically. If all 6 fail, **AegisBridge** runs as a last-resort fallback.
-
-### AI Engine v2 — Dual Provider
-- **Bytez AI** (primary) — fast, modern LLM inference at [bytez.com](https://bytez.com)
-- **OpenRouter** (fallback) — automatically used if Bytez is unavailable
-- **Offline KB** — OWASP Top 10 + API Security Top 10 fallback when both APIs are down
-- Generates a **7-phase × 6-task todo matrix** at scan start
-- Analyzes each phase result and decides next steps in real time
-- All tool output **JSON-parsed before AI prompts** — prompt injection prevention
+Every phase runs tools in sequence. If a tool fails, times out, or isn't installed, the next one takes over automatically. If all fail, **AegisBridge** runs as last resort.
 
 ### WAF Detection & Bypass
 - Detects WAF vendor via `wafw00f`
@@ -109,13 +185,6 @@ Every phase runs 6 tools in sequence. If a tool fails, times out, or isn't insta
 - Routes all tool traffic through **Tor** via proxychains4
 - Rate limited to 2 rps with 500–3000ms random jitter
 - Automatic identity rotation via NEWNYM signal
-
-### Real-Time Web Dashboard
-- Live vulnerability feed, radar chart, phase progress bars
-- AI Decision Panel with live reasoning per phase
-- Embedded xterm.js terminal (PTY-backed, full interactive shell)
-- TLS on port 5443 (self-signed cert auto-generated)
-- Dynamic hacker UI — Orbitron font, animated grid, scanline overlay
 
 ---
 
@@ -142,7 +211,7 @@ HackEmpire X stores all configuration in:
 ~/.hackempire/config.json
 ```
 
-This file is **created automatically on first run** — you never need to create it manually. After running `./hackempire --status` or any command, the file will exist at:
+Created automatically on first run. After running any command it will exist at:
 
 ```
 /home/YOUR_USERNAME/.hackempire/config.json
@@ -159,10 +228,10 @@ Or read it directly:
 cat ~/.hackempire/config.json
 ```
 
-It will look like this (empty keys until you fill them in):
+Example config:
 ```json
 {
-  "bytez_key": "",
+  "bytez_api_key": "",
   "openrouter_key": "",
   "proxy": ""
 }
@@ -171,7 +240,7 @@ It will look like this (empty keys until you fill them in):
 ### Set your AI keys
 
 ```bash
-# Bytez AI — primary provider (https://bytez.com)
+# Bytez AI — primary provider (https://bytez.com) — covers all 5 ModelChain models
 ./hackempire config bytez_key YOUR_BYTEZ_KEY
 
 # OpenRouter — fallback provider (https://openrouter.ai)
@@ -189,23 +258,25 @@ It will look like this (empty keys until you fill them in):
 
 | Provider | URL | Notes |
 |----------|-----|-------|
-| Bytez AI | [bytez.com](https://bytez.com) | Primary — sign up and copy key from dashboard |
+| Bytez AI | [bytez.com](https://bytez.com) | Primary — one key covers all 5 free models |
 | OpenRouter | [openrouter.ai](https://openrouter.ai) | Fallback — free tier available |
 
-**AI provider priority:** Bytez → OpenRouter → Offline KB. No API key required — the built-in knowledge base works fully offline.
+**AI provider priority:** Qwen3-4B → Mistral-7B → gemma-3-4b → gpt-4o-mini → gpt-4.1-mini → OpenRouter → OfflineKB
+
+No API key required — the built-in knowledge base works fully offline.
 
 ---
 
 ## Usage
 
 ```bash
-# Full 7-phase scan
-./hackempire scan example.com --mode full
+# Full autonomous scan — AI drives everything (v4 ultra mode)
+./hackempire scan example.com --mode ultra --web
 
-# Full scan + live web dashboard
-./hackempire scan example.com --mode full --web
+# Autonomous mode without ultra (explicit flag)
+./hackempire scan example.com --autonomous --web
 
-# AI-assisted scan (uses saved keys from config automatically)
+# Full 7-phase scan (standard sequential mode)
 ./hackempire scan example.com --mode full --web
 
 # Stealth mode (Tor + rate limiting)
@@ -234,17 +305,19 @@ It will look like this (empty keys until you fill them in):
 
 | Command | Description |
 |---------|-------------|
-| `scan <target> --mode full` | Run complete 7-phase pipeline |
+| `scan <target> --mode ultra` | Autonomous scan — AI selects tools and drives all phases |
+| `scan <target> --autonomous` | Autonomous mode independent of --mode ultra |
+| `scan <target> --mode full` | Standard 7-phase sequential scan |
 | `scan <target> --mode recon-only` | Recon phase only |
 | `scan <target> --mode stealth` | Scan via Tor + rate limiting |
 | `scan <target> --mode exploit` | Full scan + active exploitation |
-| `scan <target> --web` | Launch live dashboard at https://127.0.0.1:5443 |
+| `scan <target> --web` | Launch Dashboard v2 at https://127.0.0.1:5443 |
 | `scan <target> --resume` | Resume an interrupted scan |
 | `scan <target> --proxy http://127.0.0.1:8080` | Route through Burp Suite |
 | `report --format pdf\|json\|html\|markdown\|csv` | Export latest report |
-| `install-tools` | Install all 40+ pentest tools |
-| `config <key> <value>` | Set a config value (bytez_key, openrouter_key, proxy) |
-| `config show` | Show current config from ~/.hackempire/config.json |
+| `install-tools` | Install all 55+ pentest tools |
+| `config <key> <value>` | Set a config value |
+| `config show` | Show current config |
 | `--status` | Show tool health status |
 | `--doctor` | Diagnose and auto-fix broken tools |
 | `--clean` | Clear logs and temp files |
@@ -252,16 +325,32 @@ It will look like this (empty keys until you fill them in):
 
 ---
 
-## Web Dashboard
+## Web Dashboard v2
 
 Open `https://127.0.0.1:5443` when running with `--web`.
 
+### New v4 Panels
+
+| Route / Panel | Description |
+|---------------|-------------|
+| **AttackGraph** | Live directed graph — hosts, services, exploit paths via vis.js |
+| **MITREOverlay** | ATT&CK technique grid — highlights on each confirmed finding |
+| **PoCPreview** | Latest generated PoC — curl command + affected URL |
+| **AutonomousFeed** | Real-time AI decision log during autonomous mode |
+| **KBViewer** | Browse + search RAG_KB entries for current target |
+
+### All Routes
+
 | Route | Description |
 |-------|-------------|
-| `/dashboard` | Live scan — phase bars, radar chart, vuln feed, AI panel, terminal |
+| `/dashboard` | Main dashboard — all panels, phase bars, vuln feed, terminal |
 | `/report` | Full vulnerability report with severity and remediation |
 | `/logs` | Auto-refreshing log viewer |
-| `/api/state` | Raw scan state JSON |
+| `/api/state` | Full scan state JSON (includes v4 panel data for state replay) |
+| `/api/attack-graph` | JSON graph data for AttackGraph panel |
+| `/api/mitre-overlay` | JSON list of `{finding, technique_id, tactic}` |
+| `/api/kb` | JSON list of RAG_KB entries for current target |
+| `/api/autonomous-feed` | JSON list of recent autonomous decisions |
 | `/api/report/json` | Download JSON report |
 | `/api/report/pdf` | Download PDF report |
 | `/api/report/html` | Download HTML report |
@@ -277,27 +366,28 @@ Open `https://127.0.0.1:5443` when running with `--web`.
 | `HACKEMPIRE_TOOL_TIMEOUT_S` | `60` | Per-tool timeout (seconds) |
 | `HACKEMPIRE_MAX_WORKERS` | `4` | Parallel tool threads |
 | `HACKEMPIRE_RATE_LIMIT_RPS` | `10` | Requests/sec (2 in stealth mode) |
+| `BYTEZ_API_KEY` | — | Bytez API key (fallback if not in config.json) |
 
 ---
 
-## Tool Registry (40+ tools)
+## Tool Registry (55+ tools)
 
 <details>
 <summary>Click to expand full tool list</summary>
 
-**Recon:** subfinder, httpx, dnsx, nmap, whatweb, assetfinder, amass, shuffledns, github-subdomains
+**Recon:** subfinder, httpx, dnsx, nmap, whatweb, assetfinder, amass, shuffledns, github-subdomains, **theHarvester, recon-ng, dnsenum, fierce**
 
 **URL Discovery:** katana, gau, waybackurls, hakrawler, gospider, cariddi, waymore, anew, qsreplace
 
-**Enumeration:** feroxbuster, ffuf, dirsearch, arjun, gobuster, wfuzz, kiterunner, enum4linux-ng, smbmap
+**Enumeration:** feroxbuster, ffuf, dirsearch, arjun, gobuster, wfuzz, kiterunner, enum4linux-ng, smbmap, **WPProbe, wpscan, joomscan**
 
-**Vuln Scan:** nuclei, nikto, naabu, afrog, sslyze, interactsh-client, wafw00f, dalfox, jsluice
+**Vuln Scan:** nuclei, nikto, naabu, afrog, sslyze, interactsh-client, wafw00f, dalfox, jsluice, **SSTImap, zaproxy, semgrep**
 
-**Exploitation:** sqlmap, commix, tplmap, ghauri, xsstrike, dalfox, metasploit (gated)
+**Exploitation:** sqlmap, commix, tplmap, ghauri, xsstrike, dalfox, **MetasploitMCP, ysoserial, certipy**
 
-**Post-Exploit:** linpeas, netexec, chisel, ligolo-ng, impacket, bloodhound, ldapdomaindump
+**Post-Exploit:** linpeas, netexec, chisel, ligolo-ng, impacket, bloodhound, ldapdomaindump, **AdaptixC2, Atomic-Operator, pypykatz, pspy, evil-winrm**
 
-**Reporting:** WeasyPrint (PDF), JSON, HTML, Markdown, CSV
+**Reporting:** WeasyPrint (PDF), JSON, HTML, Markdown, CSV, HackerOne format
 
 </details>
 
@@ -312,6 +402,7 @@ Open `https://127.0.0.1:5443` when running with `--web`.
 - Exploitation tools **gated behind `--mode exploit`** with explicit confirmation
 - TLS on all web traffic (self-signed cert, port 5443)
 - All tool output **JSON-parsed** before AI prompts — prompt injection prevention
+- RAG_KB stored locally at `~/.hackempire/kb/` — no data leaves your machine
 
 ---
 
@@ -319,7 +410,7 @@ Open `https://127.0.0.1:5443` when running with `--web`.
 
 ```bash
 python -m pytest tests/ -q
-# 84 passed
+# 197 passed
 ```
 
 ---
