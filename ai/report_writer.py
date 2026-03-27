@@ -193,6 +193,8 @@ class ReportWriter:
     def _ai_generate(self, vuln: Vulnerability, poc: ProofOfConcept | None) -> H1Report | None:
         try:
             prompt = self._build_report_prompt(vuln, poc)
+            if not hasattr(self._ai, "_send"):
+                return None
             response = self._ai._send(prompt)
             if response.get("status_code") != 200 or not response.get("raw_text"):
                 return None
@@ -279,8 +281,14 @@ class ReportWriter:
         if vuln.evidence:
             supporting += f"\n\nEvidence:\n{vuln.evidence[:500]}"
 
+        # Safe URL domain extraction
+        try:
+            domain = vuln.url.split("/")[2] if vuln.url.count("/") >= 2 else vuln.url
+        except (IndexError, AttributeError):
+            domain = vuln.url or "unknown"
+
         return H1Report(
-            title=f"{vuln.name} in {vuln.url.split('/')[2] if '/' in vuln.url else vuln.url}",
+            title=f"{vuln.name} in {domain}",
             severity=_H1_SEVERITY.get(vuln.severity, "medium"),
             summary=(
                 f"A {vuln.name} vulnerability was discovered at {vuln.url}. "

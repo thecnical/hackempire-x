@@ -227,14 +227,14 @@ def _classify_vuln(vuln: Vulnerability) -> str:
     name = vuln.name.lower()
     if "xss" in name or "cross-site scripting" in name:
         return "xss"
-    if "sql" in name or "sqli" in name or "injection" in name and "command" not in name:
-        return "sqli"
     if "ssrf" in name or "server-side request" in name:
         return "ssrf"
-    if "lfi" in name or "path traversal" in name or "local file" in name:
-        return "lfi"
     if "rce" in name or "remote code" in name or "command injection" in name:
         return "rce"
+    if "sql" in name or "sqli" in name or ("injection" in name and "command" not in name and "template" not in name):
+        return "sqli"
+    if "lfi" in name or "path traversal" in name or "local file" in name:
+        return "lfi"
     if "idor" in name or "insecure direct" in name or "broken object" in name:
         return "idor"
     if "redirect" in name or "open redirect" in name:
@@ -249,18 +249,26 @@ def _classify_vuln(vuln: Vulnerability) -> str:
 def _build_curl(url: str, payload: str, vuln_type: str) -> str:
     """Build a curl command demonstrating the PoC."""
     safe_url = url.rstrip("/")
+    # Skip curl for IDOR — it's a manual process
+    if vuln_type == "idor":
+        return f"# Manual: {payload}"
     if vuln_type in ("xss", "sqli", "lfi", "ssti", "open_redirect"):
-        # Append payload as query param
         sep = "&" if "?" in safe_url else "?"
-        return f"curl -sk '{safe_url}{sep}q={payload}' | grep -i '{payload[:20]}'"
+        # URL-encode single quotes in payload for shell safety
+        safe_payload = payload.replace("'", "%27")
+        return f"curl -sk '{safe_url}{sep}q={safe_payload}'"
     if vuln_type == "ssrf":
         sep = "&" if "?" in safe_url else "?"
-        return f"curl -sk '{safe_url}{sep}url={payload}'"
+        safe_payload = payload.replace("'", "%27")
+        return f"curl -sk '{safe_url}{sep}url={safe_payload}'"
     if vuln_type == "rce":
         sep = "&" if "?" in safe_url else "?"
-        return f"curl -sk '{safe_url}{sep}cmd={payload}'"
+        safe_payload = payload.replace("'", "%27")
+        return f"curl -sk '{safe_url}{sep}cmd={safe_payload}'"
     if vuln_type == "misconfig":
-        return f"curl -sk '{safe_url}/{payload.lstrip('/')}'"
+        # payload is a path like /.git/config
+        clean_path = payload if payload.startswith("/") else f"/{payload}"
+        return f"curl -sk '{safe_url}{clean_path}'"
     return f"curl -sk '{safe_url}' -d 'payload={payload}'"
 
 
@@ -307,6 +315,12 @@ class PoCGenerator:
         """Ask AI to generate a working PoC."""
         try:
             prompt = self._build_poc_prompt(vuln)
+            # Use public verify_finding if available, else _send as fallback
+            if hasattr(self._ai, "verify_finding"):
+                # verify_finding returns float — not suitable here, use _send
+                pass
+            if not hasattr(self._ai, "_send"):
+                return None
             response = self._ai._send(prompt)
             if response.get("status_code") != 200 or not response.get("raw_text"):
                 return None
@@ -366,12 +380,11 @@ class PoCGenerator:
         vuln_type = _classify_vuln(vuln)
         template = _POC_TEMPLATES.get(vuln_type, _POC_TEMPLATES["misconfig"])
         payload = template["payloads"][0]
-        # Use evidence payload if available and looks like a real payload
-        if vuln.evidence and len(vuln.evidence) < 200:
-            for p in template["payloads"]:
-                if any(c in vuln.evidence for c in ["<", "'", "=", "../", "{{"]):
-                    payload = vuln.evidence[:100]
-                    break
+        # Use evidence as payload only if it looks like an actual payload (not prose)
+        if vuln.evidence and len(vuln.evidence) < 150:
+            evidence = vuln.evidence.strip()
+            if any(c in evidence for c in ["<", "'", "=", "../", "{{", "$(", "; "]):
+                payload = evidence
         return ProofOfConcept(
             vuln_name=vuln.name,
             severity=vuln.severity,
@@ -381,6 +394,6 @@ class PoCGenerator:
             expected_response=f"Response confirms {vuln.name} vulnerability",
             impact=template["impact"],
             remediation=template["remediation"],
-            steps_to_reproduce=template["steps"],
+            steps_to_reproduce=list(template["steps"]),
             ai_generated=False,
         )
