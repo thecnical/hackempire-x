@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+import sys
+import os
+
+# Add the hackempire directory to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import _bootstrap  # noqa: F401
+import json
+from pathlib import Path
+
+
+def _ensure_config():
+    config_dir = Path.home() / ".hackempire"
+    config_file = config_dir / "config.json"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    if not config_file.exists():
+        config_file.write_text(json.dumps({
+            "bytez_key": "",
+            "openrouter_key": "",
+            "proxy": ""
+        }, indent=2), encoding="utf-8")
+
+
+from cli.cli import run_cli
+
+
+def main():
+    _ensure_config()
+    return run_cli()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
