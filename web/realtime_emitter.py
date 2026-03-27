@@ -28,7 +28,7 @@ class RealTimeEmitter:
         When ``None`` is passed every emit call is a no-op (logged at DEBUG level).
     """
 
-    def __init__(self, socketio: Any) -> None:
+    def __init__(self, socketio: Any = None) -> None:
         self._socketio = socketio
 
     # ------------------------------------------------------------------

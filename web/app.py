@@ -41,7 +41,13 @@ def create_app() -> Flask:
     app.register_blueprint(bp)
 
     if _SOCKETIO_AVAILABLE:
-        socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+        socketio = SocketIO(
+            app,
+            cors_allowed_origins="*",
+            async_mode="threading",
+            logger=False,
+            engineio_logger=False,
+        )
         app.extensions["socketio"] = socketio
         _register_socketio_handlers(socketio)
 
@@ -69,22 +75,56 @@ def _register_socketio_handlers(socketio: "SocketIO") -> None:
 
 
 def run_server(host: str = "127.0.0.1", port: int = 5443, debug: bool = False) -> None:
+    import socket as _socket
+
+    # Check if port is already in use — if so, skip starting a new server
+    def _port_in_use(p: int) -> bool:
+        with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as s:
+            s.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+            try:
+                s.bind((host, p))
+                return False
+            except OSError:
+                return True
+
+    if _port_in_use(port):
+        _log.warning("Port %d already in use — dashboard already running at https://%s:%d/dashboard", port, host, port)
+        return
+
     app = create_app()
     socketio = app.extensions.get("socketio") if _SOCKETIO_AVAILABLE else None
+
+    # Try TLS first, fall back to plain HTTP
+    ssl_ctx = None
     try:
         cert_path, key_path = ensure_tls_cert()
+        ssl_ctx = (cert_path, key_path)
+    except Exception as exc:
+        _log.warning("TLS cert unavailable, using HTTP: %s", exc)
+
+    try:
         if socketio is not None:
-            socketio.run(app, host=host, port=port, debug=debug, use_reloader=False,
-                         ssl_context=(cert_path, key_path))
+            socketio.run(
+                app, host=host, port=port, debug=debug,
+                use_reloader=False, allow_unsafe_werkzeug=True,
+                ssl_context=ssl_ctx,
+            )
         else:
-            app.run(host=host, port=port, debug=debug, use_reloader=False,
-                    ssl_context=(cert_path, key_path))
-    except RuntimeError as exc:
-        _log.warning("TLS setup failed, falling back to HTTP on port 5000: %s", exc)
-        if socketio is not None:
-            socketio.run(app, host=host, port=5000, debug=debug, use_reloader=False)
-        else:
-            app.run(host=host, port=5000, debug=debug, use_reloader=False)
+            app.run(
+                host=host, port=port, debug=debug,
+                use_reloader=False, ssl_context=ssl_ctx,
+            )
+    except Exception as exc:
+        _log.warning("Server on port %d failed (%s), trying HTTP on port 5000", port, exc)
+        try:
+            if not _port_in_use(5000):
+                if socketio is not None:
+                    socketio.run(app, host=host, port=5000, debug=debug,
+                                 use_reloader=False, allow_unsafe_werkzeug=True)
+                else:
+                    app.run(host=host, port=5000, debug=debug, use_reloader=False)
+        except Exception as exc2:
+            _log.error("Web server failed to start: %s", exc2)
 
 
 if __name__ == "__main__":

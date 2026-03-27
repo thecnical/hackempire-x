@@ -78,7 +78,12 @@ class Logger:
     def debug(self, message: str) -> None:
         self._log(logging.DEBUG, "DEBUG", message)
 
-    def info(self, message: str) -> None:
+    def info(self, message: str, *args: object) -> None:
+        if args:
+            try:
+                message = message % args
+            except Exception:
+                message = " ".join([message] + [str(a) for a in args])
         self._print("INFO", message, style="bold cyan")
         self._log(logging.INFO, "INFO", message)
 
@@ -86,7 +91,13 @@ class Logger:
         self._print("SUCCESS", message, style="bold green")
         self._log(logging.INFO, "SUCCESS", message)
 
-    def warning(self, message: str) -> None:
+    def warning(self, message: str, *args: object) -> None:
+        # Support both f-string style and % format style calls
+        if args:
+            try:
+                message = message % args
+            except Exception:
+                message = " ".join([message] + [str(a) for a in args])
         self._print("WARNING", message, style="bold yellow")
         self._log(logging.WARNING, "WARNING", message)
 

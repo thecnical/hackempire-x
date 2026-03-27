@@ -537,28 +537,35 @@ def _run_v2_scan(
     except Exception as exc:
         logger.warning(f"[v2] WafDetector unavailable: {exc}")
 
-    # ── Web dashboard ─────────────────────────────────────────────────────
+    # ── Web dashboard + RealTimeEmitter ──────────────────────────────────
+    emitter = None
+    try:
+        from web.realtime_emitter import RealTimeEmitter
+        emitter = RealTimeEmitter(socketio=None)
+    except Exception as exc:
+        logger.warning(f"[v2] RealTimeEmitter unavailable: {exc}")
+
     if web:
         import threading
+        import time as _time
         try:
-            from web.app import run_server
+            from web.app import create_app, run_server
+            _flask_app = create_app()
+            from web.app import _SOCKETIO_AVAILABLE
+            if _SOCKETIO_AVAILABLE:
+                _sio = _flask_app.extensions.get("socketio")
+                if _sio is not None and emitter is not None:
+                    emitter._socketio = _sio
             web_thread = threading.Thread(
                 target=run_server,
                 kwargs={"host": "127.0.0.1", "port": 5443, "debug": False},
                 daemon=True,
             )
             web_thread.start()
+            _time.sleep(1)  # Give server a moment to bind
             logger.success("[v2] Dashboard → https://127.0.0.1:5443/dashboard")
         except Exception as exc:
             logger.warning(f"[v2] Web dashboard failed: {exc}")
-
-    # ── Subsystems ────────────────────────────────────────────────────────
-    emitter = None
-    try:
-        from web.realtime_emitter import RealTimeEmitter
-        emitter = RealTimeEmitter()
-    except Exception as exc:
-        logger.warning(f"[v2] RealTimeEmitter unavailable: {exc}")
 
     tool_manager = None
     try:
