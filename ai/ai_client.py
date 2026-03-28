@@ -14,7 +14,7 @@ from typing import Any, Optional
 import requests
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_DEFAULT_MODEL = "meta-llama/llama-3-8b-instruct:free"
+OPENROUTER_DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
 
 
 class AIClient:

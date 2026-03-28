@@ -54,12 +54,10 @@ VENV_BASE = Path(".hackempire/venvs")
 TOOL_VENV_PACKAGES: dict[str, list[str]] = {
     "arjun": ["arjun"],
     "paramspider": ["paramspider"],
-    "ghauri": ["ghauri"],
-    "bloodhound": ["bloodhound"],
-    "impacket": ["impacket"],
-    "crackmapexec": ["crackmapexec"],
     "sqlmap": ["sqlmap"],
     "xsstrike": ["requests", "fuzzywuzzy"],
+    "impacket": ["impacket"],
+    # Note: ghauri, crackmapexec, bloodhound need system/apt install — not pip venv
 }
 
 

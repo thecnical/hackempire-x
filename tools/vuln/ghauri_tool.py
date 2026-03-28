@@ -13,7 +13,7 @@ ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 class GhauriTool(BaseTool):
     name = "ghauri"
     phase = "vuln_scan"
-    venv_packages = ["ghauri"]
+    venv_packages = []  # ghauri needs git clone install — not pip
 
     def __init__(
         self,
@@ -25,17 +25,15 @@ class GhauriTool(BaseTool):
     ) -> None:
         super().__init__(timeout_s=timeout_s, proxy=proxy)
         self._web_scheme = web_scheme
-        self._venv_python = venv_python
+        self._venv_python = None  # Never use venv for ghauri
 
     def check_installed(self) -> bool:
-        if self._venv_python and self._venv_python.exists():
-            return True
-        return shutil.which(self.name) is not None
+        return shutil.which("ghauri") is not None or Path("/opt/ghauri/ghauri.py").exists()
 
     def build_command(self, target: str) -> list[str]:
         base = f"{self._web_scheme}://{target}"
-        if self._venv_python:
-            cmd = [str(self._venv_python), "-m", "ghauri", "-u", base, "--batch"]
+        if Path("/opt/ghauri/ghauri.py").exists():
+            cmd = ["python3", "/opt/ghauri/ghauri.py", "-u", base, "--batch"]
         else:
             cmd = ["ghauri", "-u", base, "--batch"]
         if self._proxy:

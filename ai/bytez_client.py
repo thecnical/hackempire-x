@@ -46,36 +46,41 @@ class BytezClient:
             return {"raw_text": "", "status_code": 0}
 
         headers = {
-            "Authorization": f"Bearer {self._api_key}",
+            "Authorization": f"{self._api_key}",
             "Content-Type": "application/json",
         }
+        # Bytez API: POST /models/v2/{modelId} — NOT /chat/completions
         payload = {
-            "model": self._model,
             "messages": [{"role": "user", "content": prompt}],
             "stream": False,
+            "params": {
+                "max_length": 2048,
+                "temperature": 0.3,
+            },
         }
 
         last_error: Optional[BaseException] = None
-        backoff_s = 1.0
 
-        for attempt in range(1, 4):
+        for attempt in range(1, 3):
             try:
+                url = f"{BYTEZ_BASE_URL}/{self._model}"
                 resp = requests.post(
-                    f"{BYTEZ_BASE_URL}/chat/completions",
+                    url,
                     headers=headers,
                     json=payload,
                     timeout=self._timeout_s,
                 )
-                # Extract text from Bytez response format
                 raw_text = ""
                 if resp.status_code == 200:
                     try:
                         data = resp.json()
+                        # Bytez response format
                         choices = data.get("choices", [])
                         if choices:
                             raw_text = choices[0].get("message", {}).get("content", "")
                         if not raw_text:
-                            raw_text = resp.text
+                            # Try output field
+                            raw_text = data.get("output", "") or data.get("text", "") or resp.text
                     except Exception:
                         raw_text = resp.text
                 else:
@@ -86,9 +91,8 @@ class BytezClient:
             except requests.exceptions.RequestException as exc:
                 last_error = exc
 
-            if attempt < 3:
-                time.sleep(backoff_s)
-                backoff_s *= 2
+            if attempt < 2:
+                time.sleep(1.0)
 
         return {
             "raw_text": "",
